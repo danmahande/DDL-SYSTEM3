@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("viewer")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Merchant {
+  id           String   @id @default(cuid())
+  merchantId   String   @unique
+  businessName String
+  contact      String
+  email        String
+  isActive     Boolean  @default(true)
+  createdBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Product {
+  id                String  @id @default(cuid())
+  productId         String  @unique
+  productLabel      String
+  brand             String?
+  variant           String?
+  category          String
+  merchantId        String
+  merchantName      String
+  unit              String
+  minStock          Int     @default(10)
+  unitCost          Float
+  unitSellingPrice  Float
+  commissionPercent Float
+  currentStock      Int     @default(0)
+  isActive          Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DemandSignal {
+  id              String   @id @default(cuid())
+  signalId        String   @unique
+  shopkeeperId    String
+  neighborhood    String
+  productCategory String
+  productLabel    String
+  packageSize     String   // sachet, small, medium, large, bulk
+  priceTier       String   // budget, mid-range, premium
+  quantity        Int      @default(1)
+  urgency         String   @default("normal") // urgent, normal, low
+  status          String   @default("pending") // pending, assigned, in_transit, delivered, cancelled
+  latitude        Float?
+  longitude       Float?
+  isSynced        Boolean  @default(false)
+  syncedAt        DateTime?
+  privacyApplied  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Neighborhood {
+  id                  String   @id @default(cuid())
+  name                String   @unique
+  boundary            Json?    // GeoJSON polygon
+  buyingPowerCategory String?  // HIGH, AVERAGE, BUDGET
+  confidenceScore     Float?
+  totalSignals        Int      @default(0)
+  dominantPriceTier  String?
+  topProductCategory String?
+  lastPredictedAt     DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model BuyingPowerPrediction {
+  id                String   @id @default(cuid())
+  neighborhoodId    String
+  neighborhood      Neighborhood @relation(fields: [neighborhoodId], references: [id])
+  predictedCategory String
+  confidenceScore   Float
+  featureVector     Json
+  modelVersion      String
+  accuracyScore     Float?
+  runAt             DateTime @default(now())
+}
+
+model Route {
+  id              String   @id @default(cuid())
+  routeId         String   @unique
+  driverId        String
+  driver          Driver   @relation(fields: [driverId], references: [id])
+  date            DateTime
+  totalDistance   Float?
+  estimatedTime   Int?
+  stopsCount      Int      @default(0)
+  completedStops  Int      @default(0)
+  status          String   @default("planned") // planned, active, completed
+  optimizationData Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  stops           RouteStop[]
+}
+
+model RouteStop {
+  id              String   @id @default(cuid())
+  routeId         String
+  route           Route    @relation(fields: [routeId], references: [id])
+  signalId        String?
+  neighborhoodId  String
+  stopSequence    Int
+  latitude        Float
+  longitude       Float
+  estimatedArrival DateTime?
+  timeWindowStart DateTime?
+  timeWindowEnd   DateTime?
+  status          String   @default("pending") // pending, arrived, completed, skipped, failed
+  completedAt     DateTime?
+  notes           String?
+}
+
+model Driver {
+  id              String   @id @default(cuid())
+  driverId        String   @unique
+  name            String
+  phone           String
+  vehicleNumber   String?
+  licenseNumber   String?
+  status          String   @default("active") // active, on_delivery, on_leave, inactive
+  currentLatitude Float?
+  currentLongitude Float?
+  lastLocationUpdate DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  routes          Route[]
+}
+
+model Setting {
+  id       String @id @default(cuid())
+  key      String @unique
+  value    String
+  category String // general, privacy, prediction, routing
+}
+
+model PrivacyAuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  epsilon    Float?
+  details    Json?
+  createdAt  DateTime @default(now())
+}
