@@ -132,12 +132,55 @@ export default function DemandMapModule() {
     }
   };
 
+  // Helper function to configure style, terrain, and fog
+  const configureMapStyle = () => {
+    if (!map.current) return;
+
+    try {
+      // Try to set Mapbox Standard config properties (only works with Standard style)
+      try {
+        map.current.setConfigProperty("basemap", "lightPreset", "dusk");
+        map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
+        map.current.setConfigProperty("basemap", "showTransitLabels", true);
+      } catch (configError) {
+        // Ignore if style doesn't support these config properties
+      }
+
+      // Add terrain source if it doesn't exist yet
+      if (!map.current.getSource("mapbox-dem")) {
+        map.current.addSource("mapbox-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+
+      // Now set terrain
+      map.current.setTerrain({
+        source: "mapbox-dem",
+        exaggeration: 1.5,
+      });
+
+      // Add fog
+      map.current.setFog({
+        range: [0.5, 10],
+        color: "#e0e7ff",
+        "horizon-blend": 0.15,
+      });
+
+      console.log("Map style configured with terrain!");
+    } catch (e) {
+      console.log("Could not configure map style:", e);
+    }
+  };
+
   useEffect(() => {
     if (!mapContainer.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/standard", // Mapbox Standard has great terrain, water, and greenery
+      style: STYLE_OPTIONS.STREETS,
       center: KAMPALA_CENTER,
       zoom: KAMPALA_ZOOM,
       pitch: KAMPALA_PITCH,
@@ -156,34 +199,8 @@ export default function DemandMapModule() {
     });
     map.current.addControl(geolocateControl, "top-right");
 
-    map.current.on("style.load", () => {
-      if (!map.current) return;
-
-      // Mapbox Standard already has terrain, water, greenery, and 3D buildings!
-      // Just enable terrain!
-      try {
-        map.current.setConfigProperty("basemap", "lightPreset", "dusk"); // Nice lighting
-        map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
-        map.current.setConfigProperty("basemap", "showTransitLabels", true);
-        
-        // Enable terrain (Mapbox Standard has built-in terrain)
-        map.current.setTerrain({
-          source: "mapbox-dem",
-          exaggeration: 1.5, // Make terrain more visible
-        });
-
-        // Add fog for atmosphere
-        map.current.setFog({
-          range: [0.5, 10],
-          color: "#e0e7ff", // Light blue fog for dusk
-          "horizon-blend": 0.15,
-        });
-
-        console.log("Mapbox Standard style loaded with terrain, water, greenery, and 3D buildings!");
-      } catch (e) {
-        console.log("Could not configure Mapbox Standard:", e);
-      }
-    });
+    // Configure style on load
+    map.current.on("style.load", configureMapStyle);
 
     map.current.on("styleimagemissing", (e) => {
       map.current?.addImage(e.id, new ImageData(1, 1));
@@ -193,6 +210,18 @@ export default function DemandMapModule() {
       map.current?.remove();
     };
   }, []);
+
+  // Reconfigure terrain when switching styles
+  useEffect(() => {
+    if (map.current) {
+      // Wait for style to load, then configure
+      if (map.current.isStyleLoaded()) {
+        configureMapStyle();
+      } else {
+        map.current.once("style.load", configureMapStyle);
+      }
+    }
+  }, [currentStyle]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
