@@ -23,6 +23,7 @@
     "date-fns": "^4.4.0",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.17.0",
+    "mapbox-gl": "^3.24.0",
     "maplibre-gl": "^5.24.0",
     "next": "^16.2.7",
     "react": "^19.2.7",
@@ -38,6 +39,8 @@
   },
   "devDependencies": {
     "@types/node": "25.9.1",
+    "cesium": "^1.142.0",
+    "copy-webpack-plugin": "^14.0.0",
     "prisma": "^7.8.0"
   }
 }

@@ -9,11 +9,13 @@ export const KAMPALA_BOUNDS: [[number, number], [number, number]] = [
   [33.0, 0.7],
 ];
 
-// Style options
-export const STYLE_OPTIONS = {
-  OSM_DARK: "https://tiles.stadiamaps.com/styles/alidade_smooth_dark.json",
-  ESRI_IMAGERY: "https://tiles.stadiamaps.com/styles/osm_bright.json", // We'll use a hybrid approach for ESRI
-};
+// Mapbox Configuration - GET YOUR TOKEN AT https://account.mapbox.com/
+// Add your token to .env.local file as NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+export const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
-// Stadia Maps Alidade Smooth Dark - free, beautiful, Mapbox-like dark vector style!
-export const MAP_STYLE = STYLE_OPTIONS.OSM_DARK;
+// Mapbox Style URLs
+export const STYLE_OPTIONS = {
+  DARK: "mapbox://styles/mapbox/dark-v11",
+  STREETS: "mapbox://styles/mapbox/streets-v12",
+  SATELLITE_STREETS: "mapbox://styles/mapbox/satellite-streets-v12",
+};

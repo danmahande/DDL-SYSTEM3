@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import {
   Search,
   Layers,
@@ -21,8 +21,12 @@ import {
   KAMPALA_ZOOM,
   KAMPALA_PITCH,
   KAMPALA_BEARING,
+  MAPBOX_ACCESS_TOKEN,
   STYLE_OPTIONS,
 } from "@/lib/map-config";
+
+// Set Mapbox access token
+mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
 const layers = [
   { id: "heatmap", label: "Heatmap", icon: TrendingUp, color: "text-red-400" },
@@ -41,7 +45,7 @@ interface SearchResult {
 
 export default function DemandMapModule() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<maplibregl.Map | null>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [activeLayers, setActiveLayers] = useState<Record<string, boolean>>({
     heatmap: true,
@@ -54,7 +58,7 @@ export default function DemandMapModule() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [currentStyle, setCurrentStyle] = useState("osm"); // osm or imagery
+  const [currentStyle, setCurrentStyle] = useState<"DARK" | "STREETS" | "SATELLITE_STREETS">("STREETS");
 
   // Nominatim search
   const handleSearch = async (query: string) => {
@@ -82,11 +86,11 @@ export default function DemandMapModule() {
       map.current.flyTo({
         center: [parseFloat(result.lon), parseFloat(result.lat)],
         zoom: 17,
-        pitch: 60,
+        pitch: KAMPALA_PITCH,
         essential: true,
       });
 
-      new maplibregl.Marker({ color: "#FF6B35" })
+      new mapboxgl.Marker({ color: "#FF6B35" })
         .setLngLat([parseFloat(result.lon), parseFloat(result.lat)])
         .addTo(map.current);
     }
@@ -105,11 +109,11 @@ export default function DemandMapModule() {
             map.current.flyTo({
               center: [longitude, latitude],
               zoom: 17,
-              pitch: 60,
+              pitch: KAMPALA_PITCH,
               essential: true,
             });
 
-            new maplibregl.Marker({ color: "#1d4ed8" })
+            new mapboxgl.Marker({ color: "#1d4ed8" })
               .setLngLat([longitude, latitude])
               .addTo(map.current);
           }
@@ -121,107 +125,19 @@ export default function DemandMapModule() {
     }
   };
 
-  const switchStyle = (style: "osm" | "imagery") => {
+  const switchStyle = (style: "DARK" | "STREETS" | "SATELLITE_STREETS") => {
     setCurrentStyle(style);
     if (map.current) {
-      if (style === "osm") {
-        map.current.setStyle(STYLE_OPTIONS.OSM_DARK);
-      } else {
-        map.current.setStyle({
-          version: 8,
-          sources: {
-            "esri-world-imagery": {
-              type: "raster",
-              tiles: [
-                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-              ],
-              tileSize: 256,
-              attribution: "&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AeroGRID, GeoEye, Earthstar Geographics, CNES/Airbus DS, GeoEye, USDA FSA, USGS, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community",
-            },
-          },
-          layers: [
-            {
-              id: "esri-world-imagery",
-              type: "raster",
-              source: "esri-world-imagery",
-              minzoom: 0,
-              maxzoom: 22,
-            },
-          ],
-        });
-      }
+      map.current.setStyle(STYLE_OPTIONS[style]);
     }
-  };
-
-  const enhanceRoads = () => {
-    if (!map.current) return;
-
-    const style = map.current.getStyle();
-    if (!style || !style.layers) return;
-
-    // Realistic, dark road color palette (matching your London reference)
-    const roadColors = {
-      highway: "#4a4a48",
-      primary: "#3a3a38",
-      secondary: "#30302e",
-      tertiary: "#2a2a28",
-      residential: "#222220",
-      service: "#1a1a18",
-    };
-
-    // Find all road-related layers and enhance them
-    style.layers.forEach((layer) => {
-      const layerId = layer.id.toLowerCase();
-
-      if (layer.type === "line" && (layerId.includes("road") || layerId.includes("highway") || layerId.includes("street"))) {
-        try {
-          // Enhance road width based on zoom and type
-          let baseWidth = 2;
-          if (layerId.includes("highway") && layerId.includes("motorway")) baseWidth = 6;
-          else if (layerId.includes("highway") || layerId.includes("primary")) baseWidth = 5;
-          else if (layerId.includes("secondary")) baseWidth = 4;
-          else if (layerId.includes("tertiary")) baseWidth = 3;
-          else if (layerId.includes("residential")) baseWidth = 2;
-
-          map.current!.setPaintProperty(layer.id, "line-width", [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            12, baseWidth,
-            16, baseWidth * 2,
-            19, baseWidth * 4,
-          ]);
-
-          // Set color based on road type
-          let lineColor = roadColors.residential;
-          if (layerId.includes("motorway")) lineColor = roadColors.highway;
-          else if (layerId.includes("highway") || layerId.includes("primary")) lineColor = roadColors.primary;
-          else if (layerId.includes("secondary")) lineColor = roadColors.secondary;
-          else if (layerId.includes("tertiary")) lineColor = roadColors.tertiary;
-          else if (layerId.includes("service")) lineColor = roadColors.service;
-
-          map.current!.setPaintProperty(layer.id, "line-color", lineColor);
-
-          // Add slight opacity
-          map.current!.setPaintProperty(layer.id, "line-opacity", 0.95);
-
-          // Make lines smoother
-          map.current!.setPaintProperty(layer.id, "line-join", "round");
-          map.current!.setPaintProperty(layer.id, "line-cap", "round");
-
-        } catch (e) {
-          console.log("Could not enhance road layer:", layer.id, e);
-        }
-      }
-    });
   };
 
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    map.current = new maplibregl.Map({
+    map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: STYLE_OPTIONS.OSM_DARK,
+      style: "mapbox://styles/mapbox/standard", // Mapbox Standard has great terrain, water, and greenery
       center: KAMPALA_CENTER,
       zoom: KAMPALA_ZOOM,
       pitch: KAMPALA_PITCH,
@@ -229,109 +145,43 @@ export default function DemandMapModule() {
       antialias: true,
     });
 
-    map.current.addControl(new maplibregl.NavigationControl(), "top-right");
-    map.current.addControl(new maplibregl.ScaleControl(), "bottom-left");
-    map.current.addControl(new maplibregl.AttributionControl(), "bottom-right");
+    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.current.addControl(new mapboxgl.ScaleControl(), "bottom-left");
+    map.current.addControl(new mapboxgl.AttributionControl(), "bottom-right");
 
-    const geolocateControl = new maplibregl.GeolocateControl({
+    const geolocateControl = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
       showUserHeading: true,
     });
     map.current.addControl(geolocateControl, "top-right");
 
-    // Add layers and enhancements after map loads
-    map.current.on("load", () => {
+    map.current.on("style.load", () => {
       if (!map.current) return;
 
-      // First enhance roads
-      enhanceRoads();
-
-      // Enhance 3D buildings
-      const style = map.current.getStyle();
-      
-      let buildingLayerFound = false;
-      style.layers.forEach((layer) => {
-        if (layer.type === "fill-extrusion" && layer.id.includes("building")) {
-          try {
-            map.current!.setPaintProperty(layer.id, "fill-extrusion-height", [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              14, 0,
-              15, ["coalesce", ["get", "render_height"], ["get", "height"], ["*", ["get", "building:levels"], 3.2], 8],
-            ]);
-            map.current!.setPaintProperty(layer.id, "fill-extrusion-color", [
-              "interpolate",
-              ["linear"],
-              ["coalesce", ["get", "render_height"], ["get", "height"], 8],
-              8, "#1e1d1c",
-              15, "#282623",
-              25, "#33302c",
-              40, "#3d3834",
-            ]);
-            map.current!.setPaintProperty(layer.id, "fill-extrusion-opacity", 0.95);
-            map.current!.setPaintProperty(layer.id, "fill-extrusion-vertical-gradient", true);
-            buildingLayerFound = true;
-          } catch (e) {
-            console.log("Could not enhance building layer:", layer.id, e);
-          }
-        }
-      });
-
-      if (!buildingLayerFound) {
-        const vectorSource = Object.keys(style.sources || {}).find(
-          (id) => style.sources?.[id].type === "vector"
-        );
-
-        if (vectorSource) {
-          try {
-            map.current.addLayer({
-              id: "ddl-buildings-3d",
-              type: "fill-extrusion",
-              source: vectorSource,
-              "source-layer": "building",
-              minzoom: 14,
-              paint: {
-                "fill-extrusion-color": [
-                  "interpolate",
-                  ["linear"],
-                  ["coalesce", ["get", "render_height"], ["get", "height"], 8],
-                  8, "#1e1d1c",
-                  15, "#282623",
-                  25, "#33302c",
-                  40, "#3d3834",
-                ],
-                "fill-extrusion-height": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  14, 0,
-                  15, ["coalesce", ["get", "render_height"], ["get", "height"], ["*", ["get", "building:levels"], 3.2], 8],
-                ],
-                "fill-extrusion-base": [
-                  "interpolate",
-                  ["linear"],
-                  ["zoom"],
-                  14, 0,
-                  15, ["get", "min_height"],
-                ],
-                "fill-extrusion-opacity": 0.95,
-                "fill-extrusion-vertical-gradient": true,
-              },
-            });
-          } catch (e) {
-            console.log("Could not add 3D buildings:", e);
-          }
-        }
-      }
-
-      if ("setFog" in map.current) {
-        (map.current as any).setFog({
-          range: [0.5, 10],
-          color: "#1a1a1a",
-          "horizon-blend": 0.1,
+      // Mapbox Standard already has terrain, water, greenery, and 3D buildings!
+      // Just enable terrain!
+      try {
+        map.current.setConfigProperty("basemap", "lightPreset", "dusk"); // Nice lighting
+        map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
+        map.current.setConfigProperty("basemap", "showTransitLabels", true);
+        
+        // Enable terrain (Mapbox Standard has built-in terrain)
+        map.current.setTerrain({
+          source: "mapbox-dem",
+          exaggeration: 1.5, // Make terrain more visible
         });
+
+        // Add fog for atmosphere
+        map.current.setFog({
+          range: [0.5, 10],
+          color: "#e0e7ff", // Light blue fog for dusk
+          "horizon-blend": 0.15,
+        });
+
+        console.log("Mapbox Standard style loaded with terrain, water, greenery, and 3D buildings!");
+      } catch (e) {
+        console.log("Could not configure Mapbox Standard:", e);
       }
     });
 
@@ -339,7 +189,9 @@ export default function DemandMapModule() {
       map.current?.addImage(e.id, new ImageData(1, 1));
     });
 
-    return () => map.current?.remove();
+    return () => {
+      map.current?.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -358,6 +210,7 @@ export default function DemandMapModule() {
     <div className="h-[calc(100vh-64px)] relative">
       <div ref={mapContainer} className="w-full h-full" />
 
+      {/* Search Bar */}
       <div className="absolute top-4 left-4 z-10 w-[480px]">
         <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden border border-white/10">
           <div className="flex items-center gap-3 px-5 py-4">
@@ -398,33 +251,46 @@ export default function DemandMapModule() {
         </div>
       </div>
 
+      {/* Style Switcher */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
         <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl border border-white/10 overflow-hidden flex">
           <button
-            onClick={() => switchStyle("osm")}
+            onClick={() => switchStyle("DARK")}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
-              currentStyle === "osm"
+              currentStyle === "DARK"
                 ? "bg-[#FF6B35] text-white"
                 : "text-gray-300 hover:bg-white/10"
             }`}
           >
             <MapIcon className="w-4 h-4" />
-            OSM Dark
+            Dark
           </button>
           <button
-            onClick={() => switchStyle("imagery")}
+            onClick={() => switchStyle("STREETS")}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
-              currentStyle === "imagery"
+              currentStyle === "STREETS"
+                ? "bg-[#FF6B35] text-white"
+                : "text-gray-300 hover:bg-white/10"
+            }`}
+          >
+            <MapIcon className="w-4 h-4" />
+            Streets
+          </button>
+          <button
+            onClick={() => switchStyle("SATELLITE_STREETS")}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+              currentStyle === "SATELLITE_STREETS"
                 ? "bg-[#FF6B35] text-white"
                 : "text-gray-300 hover:bg-white/10"
             }`}
           >
             <ImageIcon className="w-4 h-4" />
-            ESRI Imagery
+            Satellite
           </button>
         </div>
       </div>
 
+      {/* Layer Controls */}
       <div className="absolute top-4 right-4 z-10">
         <button
           onClick={() => setShowControls(!showControls)}
@@ -468,6 +334,7 @@ export default function DemandMapModule() {
         )}
       </div>
 
+      {/* Route Info Panel */}
       <div className="absolute bottom-6 left-6 right-6 lg:left-auto lg:right-6 lg:w-88">
         <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl p-5 border border-white/10">
           <h3 className="font-bold text-gray-100 mb-4 text-lg">Active Route</h3>
