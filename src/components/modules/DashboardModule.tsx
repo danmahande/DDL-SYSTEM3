@@ -14,6 +14,7 @@ import {
   XCircle,
   CheckCircle2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -22,21 +23,29 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
 } from "recharts";
 
-const demandData = [
-  { month: "Jan", signals: 120, deliveries: 95 },
-  { month: "Feb", signals: 180, deliveries: 140 },
-  { month: "Mar", signals: 150, deliveries: 120 },
-  { month: "Apr", signals: 220, deliveries: 185 },
-  { month: "May", signals: 280, deliveries: 230 },
-  { month: "Jun", signals: 250, deliveries: 210 },
-];
+interface DemandSignal {
+  id: string;
+  signalId: string;
+  productLabel: string;
+  productCategory: string;
+  neighborhood: string;
+  urgency: string;
+  status: string;
+  createdAt: string;
+  source: string;
+}
+
+interface Stats {
+  total: number;
+  pending: number;
+  active: number;
+  delivered: number;
+}
 
 const inventoryData = [
   { name: "Healthy", value: 85, color: "#22C55E" },
@@ -44,18 +53,62 @@ const inventoryData = [
   { name: "Critical", value: 5, color: "#EF4444" },
 ];
 
-const topProducts = [
-  { name: "Soda 500ml", quantity: 245, category: "Beverages" },
-  { name: "Sugar 1kg", quantity: 198, category: "Groceries" },
-  { name: "Milk 1L", quantity: 175, category: "Dairy" },
-  { name: "Bread", quantity: 156, category: "Bakery" },
-  { name: "Cooking Oil 2L", quantity: 134, category: "Groceries" },
-];
-
 export default function DashboardModule() {
+  const [signals, setSignals] = useState<DemandSignal[]>([]);
+  const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, active: 0, delivered: 0 });
+  const [loading, setLoading] = useState(true);
+  const [retailerConnected, setRetailerConnected] = useState(false);
+  const [lastRetailerSignal, setLastRetailerSignal] = useState<string | null>(null);
+
+  const fetchSignals = async () => {
+    try {
+      const res = await fetch("/api/signals");
+      const data = await res.json();
+      if (data.success) {
+        setSignals(data.data);
+        setStats(data.stats);
+
+        const retailerSignals = data.data.filter((s: DemandSignal) => s.source === "retailer_app");
+        if (retailerSignals.length > 0) {
+          setRetailerConnected(true);
+          setLastRetailerSignal(retailerSignals[0].createdAt);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching signals:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSignals();
+  }, []);
+
+  const getTopProducts = () => {
+    const productCounts: Record<string, number> = {};
+    signals.forEach((signal) => {
+      productCounts[signal.productLabel] = (productCounts[signal.productLabel] || 0) + 1;
+    });
+    return Object.entries(productCounts)
+      .map(([name, quantity]) => ({ name, quantity }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2A4A]"></div>
+      </div>
+    );
+  }
+
+  const topProducts = getTopProducts();
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <select defaultValue="This Month" className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">
             <option>Today</option>
@@ -65,9 +118,18 @@ export default function DashboardModule() {
             <option>All Time</option>
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-sm text-gray-600">Live</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${retailerConnected ? "bg-green-500 animate-pulse" : "bg-gray-400"}`} />
+            <span className="text-sm text-gray-600">
+              {retailerConnected ? "Retailer Connected" : "No Retailer Connection"}
+            </span>
+          </div>
+          {lastRetailerSignal && (
+            <span className="text-xs text-gray-500">
+              Last signal: {new Date(lastRetailerSignal).toLocaleString()}
+            </span>
+          )}
         </div>
       </div>
 
@@ -77,9 +139,8 @@ export default function DashboardModule() {
             <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center">
               <Radio className="w-6 h-6 text-orange-500" />
             </div>
-            <span className="text-green-500 text-sm font-medium">+12%</span>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">248</h3>
+          <h3 className="text-2xl font-bold text-gray-900">{stats.total}</h3>
           <p className="text-gray-600 text-sm">Active Demand Signals</p>
         </div>
 
@@ -88,9 +149,10 @@ export default function DashboardModule() {
             <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
               <MapPin className="w-6 h-6 text-emerald-500" />
             </div>
-            <span className="text-green-500 text-sm font-medium">+5%</span>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">12</h3>
+          <h3 className="text-2xl font-bold text-gray-900">
+            {new Set(signals.map((s) => s.neighborhood)).size}
+          </h3>
           <p className="text-gray-600 text-sm">Neighborhoods Covered</p>
         </div>
 
@@ -99,9 +161,10 @@ export default function DashboardModule() {
             <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
               <Truck className="w-6 h-6 text-blue-500" />
             </div>
-            <span className="text-green-500 text-sm font-medium">+18%</span>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">92%</h3>
+          <h3 className="text-2xl font-bold text-gray-900">
+            {stats.total > 0 ? Math.round((stats.delivered / stats.total) * 100) : 0}%
+          </h3>
           <p className="text-gray-600 text-sm">Delivery Efficiency</p>
         </div>
 
@@ -110,9 +173,8 @@ export default function DashboardModule() {
             <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-purple-500" />
             </div>
-            <span className="text-green-500 text-sm font-medium">+8%</span>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900">USh 24.5M</h3>
+          <h3 className="text-2xl font-bold text-gray-900">USh 0</h3>
           <p className="text-gray-600 text-sm">Predicted Revenue</p>
         </div>
       </div>
@@ -123,7 +185,7 @@ export default function DashboardModule() {
             <Store className="w-5 h-5 text-orange-500" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900">45</p>
+            <p className="text-lg font-bold text-gray-900">0</p>
             <p className="text-xs text-gray-500">Merchants</p>
           </div>
         </div>
@@ -132,7 +194,7 @@ export default function DashboardModule() {
             <Package className="w-5 h-5 text-[#1B2A4A]" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900">156</p>
+            <p className="text-lg font-bold text-gray-900">{topProducts.length}</p>
             <p className="text-xs text-gray-500">Products</p>
           </div>
         </div>
@@ -141,7 +203,7 @@ export default function DashboardModule() {
             <BarChart3 className="w-5 h-5 text-emerald-500" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900">USh 48.2K</p>
+            <p className="text-lg font-bold text-gray-900">USh 0</p>
             <p className="text-xs text-gray-500">Avg Signal Value</p>
           </div>
         </div>
@@ -150,7 +212,7 @@ export default function DashboardModule() {
             <Target className="w-5 h-5 text-amber-500" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900">5.5</p>
+            <p className="text-lg font-bold text-gray-900">0</p>
             <p className="text-xs text-gray-500">Signals/Merchant</p>
           </div>
         </div>
@@ -159,30 +221,8 @@ export default function DashboardModule() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-gray-200">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Demand Trend</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={demandData}>
-                <defs>
-                  <linearGradient id="colorSignals" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#FF6B35" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#FF6B35" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#64748B" }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748B" }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#fff", border: "1px solid #E2E8F0", borderRadius: "8px" }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="signals"
-                  stroke="#FF6B35"
-                  fillOpacity={1}
-                  fill="url(#colorSignals)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-64 flex items-center justify-center text-gray-500">
+            No trend data available yet
           </div>
         </div>
 
@@ -225,35 +265,43 @@ export default function DashboardModule() {
         <div className="bg-white rounded-2xl p-6 border border-gray-200">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Top Demanded Products</h3>
           <div className="space-y-3">
-            {topProducts.map((product, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">{product.name}</p>
-                  <p className="text-xs text-gray-500">{product.category}</p>
+            {topProducts.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No products yet</div>
+            ) : (
+              topProducts.map((product, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-gray-900">{product.name}</p>
+                  </div>
+                  <span className="text-lg font-bold text-orange-500">{product.quantity}</span>
                 </div>
-                <span className="text-lg font-bold text-orange-500">{product.quantity}</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-gray-200">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Signals</h3>
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg">
+            {signals.slice(0, 5).map((signal, i) => (
+              <div key={signal.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full ${
-                    i === 1 ? "bg-red-500" : i === 2 ? "bg-amber-500" : "bg-blue-500"
+                    signal.urgency === "urgent" ? "bg-red-500" : signal.urgency === "normal" ? "bg-amber-500" : "bg-blue-500"
                   }`} />
                   <div>
-                    <p className="font-medium text-gray-900">SIG-00{i}2</p>
-                    <p className="text-xs text-gray-500">Bugolobi Market • 2h ago</p>
+                    <p className="font-medium text-gray-900">{signal.signalId}</p>
+                    <p className="text-xs text-gray-500">
+                      {signal.neighborhood} • {new Date(signal.createdAt).toLocaleTimeString()}
+                    </p>
                   </div>
                 </div>
-                <span className="text-sm text-gray-500">Pending</span>
+                <span className="text-sm text-gray-500 capitalize">{signal.status}</span>
               </div>
             ))}
+            {signals.length === 0 && (
+              <div className="text-center py-8 text-gray-500">No signals yet</div>
+            )}
           </div>
         </div>
       </div>

@@ -54,9 +54,11 @@ model DemandSignal {
   id              String   @id @default(cuid())
   signalId        String   @unique
   shopkeeperId    String
+  businessName    String   @default("")
   neighborhood    String
   productCategory String
   productLabel    String
+  productId       String   @default("")
   packageSize     String   // sachet, small, medium, large, bulk
   priceTier       String   // budget, mid-range, premium
   quantity        Int      @default(1)
@@ -64,6 +66,9 @@ model DemandSignal {
   status          String   @default("pending") // pending, assigned, in_transit, delivered, cancelled
   latitude        Float?
   longitude       Float?
+  locationAccuracy Float?
+  source          String   @default("field_agent")
+  notes           String?
   isSynced        Boolean  @default(false)
   syncedAt        DateTime?
   privacyApplied  Boolean  @default(false)
@@ -72,29 +77,30 @@ model DemandSignal {
 }
 
 model Neighborhood {
-  id                  String   @id @default(cuid())
-  name                String   @unique
-  boundary            Json?    // GeoJSON polygon
-  buyingPowerCategory String?  // HIGH, AVERAGE, BUDGET
+  id                  String                   @id @default(cuid())
+  name                String                   @unique
+  boundary            String?                  // GeoJSON polygon (stored as string)
+  buyingPowerCategory String?                  // HIGH, AVERAGE, BUDGET
   confidenceScore     Float?
-  totalSignals        Int      @default(0)
+  totalSignals        Int                      @default(0)
   dominantPriceTier  String?
   topProductCategory String?
   lastPredictedAt     DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  buyingPowerPredictions BuyingPowerPrediction[]
 }
 
 model BuyingPowerPrediction {
-  id                String   @id @default(cuid())
+  id                String      @id @default(cuid())
   neighborhoodId    String
   neighborhood      Neighborhood @relation(fields: [neighborhoodId], references: [id])
   predictedCategory String
   confidenceScore   Float
-  featureVector     Json
+  featureVector     String      // stored as string
   modelVersion      String
   accuracyScore     Float?
-  runAt             DateTime @default(now())
+  runAt             DateTime    @default(now())
 }
 
 model Route {
@@ -108,7 +114,7 @@ model Route {
   stopsCount      Int      @default(0)
   completedStops  Int      @default(0)
   status          String   @default("planned") // planned, active, completed
-  optimizationData Json?
+  optimizationData String? // stored as string
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   stops           RouteStop[]
@@ -160,6 +166,6 @@ model PrivacyAuditLog {
   entityType String
   entityId   String
   epsilon    Float?
-  details    Json?
+  details    String? // stored as string
   createdAt  DateTime @default(now())
 }

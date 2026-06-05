@@ -17,7 +17,6 @@ import {
   Map as MapIcon,
 } from "lucide-react";
 import {
-  KAMPALA_CENTER,
   KAMPALA_ZOOM,
   KAMPALA_PITCH,
   KAMPALA_BEARING,
@@ -43,9 +42,23 @@ interface SearchResult {
   lon: string;
 }
 
+interface DemandSignal {
+  id: string;
+  signalId: string;
+  businessName: string;
+  productLabel: string;
+  quantity: number;
+  urgency: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+const BUGOLOBI_CENTER: [number, number] = [32.6106, 0.3132];
+
 export default function DemandMapModule() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const markers = useRef<mapboxgl.Marker[]>([]);
   const [showControls, setShowControls] = useState(true);
   const [activeLayers, setActiveLayers] = useState<Record<string, boolean>>({
     heatmap: true,
@@ -59,6 +72,48 @@ export default function DemandMapModule() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentStyle, setCurrentStyle] = useState<"DARK" | "STREETS" | "SATELLITE_STREETS" | "STANDARD">("STANDARD");
+  const [signals, setSignals] = useState<DemandSignal[]>([]);
+
+  const fetchSignals = async () => {
+    try {
+      const res = await fetch("/api/signals");
+      const data = await res.json();
+      if (data.success) {
+        setSignals(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching signals:", error);
+    }
+  };
+
+  const addSignalMarkers = () => {
+    if (!map.current) return;
+
+    // Clear existing markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
+
+    signals.forEach(signal => {
+      if (signal.latitude && signal.longitude && activeLayers.signals) {
+        const color = signal.urgency === "urgent" ? "#EF4444" : signal.urgency === "normal" ? "#F59E0B" : "#3B82F6";
+        
+        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+          <div style="padding: 8px;">
+            <h4 style="font-weight: bold; margin: 0 0 4px 0;">${signal.businessName || signal.signalId}</h4>
+            <p style="margin: 2px 0;">${signal.productLabel} (x${signal.quantity})</p>
+            <p style="margin: 2px 0; font-size: 12px; color: ${color};">${signal.urgency}</p>
+          </div>
+        `);
+
+        const marker = new mapboxgl.Marker({ color })
+          .setLngLat([signal.longitude, signal.latitude])
+          .setPopup(popup)
+          .addTo(map.current!);
+
+        markers.current.push(marker);
+      }
+    });
+  };
 
   // Nominatim search
   const handleSearch = async (query: string) => {
@@ -70,7 +125,7 @@ export default function DemandMapModule() {
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&viewbox=${KAMPALA_CENTER[0] - 0.5},${KAMPALA_CENTER[1] + 0.5},${KAMPALA_CENTER[0] + 0.5},${KAMPALA_CENTER[1] - 0.5}&bounded=1`,
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&viewbox=${BUGOLOBI_CENTER[0] - 0.5},${BUGOLOBI_CENTER[1] + 0.5},${BUGOLOBI_CENTER[0] + 0.5},${BUGOLOBI_CENTER[1] - 0.5}&bounded=1`,
         { headers: { "Accept-Language": "en" } }
       );
       const data = await response.json();
@@ -133,12 +188,16 @@ export default function DemandMapModule() {
   };
 
   useEffect(() => {
+    fetchSignals();
+  }, []);
+
+  useEffect(() => {
     if (!mapContainer.current) return;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: STYLE_OPTIONS[currentStyle], // Use the configured style options that will use the token
-      center: KAMPALA_CENTER,
+      center: BUGOLOBI_CENTER,
       zoom: KAMPALA_ZOOM,
       pitch: KAMPALA_PITCH,
       bearing: KAMPALA_BEARING,
@@ -169,6 +228,7 @@ export default function DemandMapModule() {
           console.log("Could not configure Mapbox Standard:", e);
         }
       }
+      addSignalMarkers();
     });
 
     map.current.on("styleimagemissing", (e) => {
@@ -179,6 +239,10 @@ export default function DemandMapModule() {
       map.current?.remove();
     };
   }, [currentStyle]); // Add currentStyle as a dependency since we're using it in the effect
+
+  useEffect(() => {
+    addSignalMarkers();
+  }, [signals, activeLayers.signals]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -329,33 +393,6 @@ export default function DemandMapModule() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Route Info Panel */}
-      <div className="absolute bottom-6 left-6 right-6 lg:left-auto lg:right-6 lg:w-88">
-        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl p-5 border border-white/10">
-          <h3 className="font-bold text-gray-100 mb-4 text-lg">Active Route</h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Route ID</span>
-              <span className="font-mono text-gray-200">RTE-20260602-001</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Driver</span>
-              <span className="text-gray-200">John Doe</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Stops</span>
-              <span className="font-medium text-gray-200">4 / 12</span>
-            </div>
-            <div className="w-full bg-white/10 rounded-full h-2.5 mt-2">
-              <div
-                className="bg-[#FF6B35] h-2.5 rounded-full"
-                style={{ width: "33%" }}
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
