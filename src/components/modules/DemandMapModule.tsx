@@ -58,7 +58,7 @@ export default function DemandMapModule() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [currentStyle, setCurrentStyle] = useState<"DARK" | "STREETS" | "SATELLITE_STREETS">("STREETS");
+  const [currentStyle, setCurrentStyle] = useState<"DARK" | "STREETS" | "SATELLITE_STREETS" | "STANDARD">("STANDARD");
 
   // Nominatim search
   const handleSearch = async (query: string) => {
@@ -125,7 +125,7 @@ export default function DemandMapModule() {
     }
   };
 
-  const switchStyle = (style: "DARK" | "STREETS" | "SATELLITE_STREETS") => {
+  const switchStyle = (style: "DARK" | "STREETS" | "SATELLITE_STREETS" | "STANDARD") => {
     setCurrentStyle(style);
     if (map.current) {
       map.current.setStyle(STYLE_OPTIONS[style]);
@@ -137,7 +137,7 @@ export default function DemandMapModule() {
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/standard",
+      style: STYLE_OPTIONS[currentStyle], // Use the configured style options that will use the token
       center: KAMPALA_CENTER,
       zoom: KAMPALA_ZOOM,
       pitch: KAMPALA_PITCH,
@@ -159,14 +159,15 @@ export default function DemandMapModule() {
     map.current.on("style.load", () => {
       if (!map.current) return;
 
-      try {
-        map.current.setConfigProperty("basemap", "lightPreset", "dusk");
-        map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
-        map.current.setConfigProperty("basemap", "showTransitLabels", true);
-        
-
-      } catch (e) {
-        console.log("Could not configure Mapbox Standard:", e);
+      // Only configure basemap properties for the STANDARD style
+      if (currentStyle === "STANDARD") {
+        try {
+          map.current.setConfigProperty("basemap", "lightPreset", "dusk");
+          map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
+          map.current.setConfigProperty("basemap", "showTransitLabels", true);
+        } catch (e) {
+          console.log("Could not configure Mapbox Standard:", e);
+        }
       }
     });
 
@@ -177,7 +178,7 @@ export default function DemandMapModule() {
     return () => {
       map.current?.remove();
     };
-  }, []);
+  }, [currentStyle]); // Add currentStyle as a dependency since we're using it in the effect
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -260,6 +261,17 @@ export default function DemandMapModule() {
           >
             <MapIcon className="w-4 h-4" />
             Streets
+          </button>
+          <button
+            onClick={() => switchStyle("STANDARD")}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+              currentStyle === "STANDARD"
+                ? "bg-[#FF6B35] text-white"
+                : "text-gray-300 hover:bg-white/10"
+            }`}
+          >
+            <MapIcon className="w-4 h-4" />
+            Standard
           </button>
           <button
             onClick={() => switchStyle("SATELLITE_STREETS")}

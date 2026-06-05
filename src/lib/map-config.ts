@@ -13,9 +13,14 @@ export const KAMPALA_BOUNDS: [[number, number], [number, number]] = [
 // Add your token to .env.local file as NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 export const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
-// Mapbox Style URLs
+if (!MAPBOX_ACCESS_TOKEN) {
+  console.warn('Mapbox access token is not set. The map may not load properly.');
+}
+
+// Mapbox Style URLs - Using the newer Standard style which shows more geographic features
 export const STYLE_OPTIONS = {
   DARK: "mapbox://styles/mapbox/dark-v11",
   STREETS: "mapbox://styles/mapbox/streets-v12",
+  STANDARD: "mapbox://styles/mapbox/standard",
   SATELLITE_STREETS: "mapbox://styles/mapbox/satellite-streets-v12",
 };
