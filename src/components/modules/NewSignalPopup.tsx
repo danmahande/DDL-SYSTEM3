@@ -13,9 +13,10 @@ export function NewSignalPopup() {
 
   const currentSignal = newSignals[newSignals.length - 1]
 
-  const handleGoToMap = () => {
+  const handleGoToMap = (e: React.MouseEvent) => {
+    e.preventDefault()
     setFocusSignal(currentSignal)
-    setCurrentModule('map')
+    setCurrentModule('demand_map')
     clearNewSignals()
   }
 
