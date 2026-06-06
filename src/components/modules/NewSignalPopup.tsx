@@ -1,12 +1,13 @@
 'use client'
 
-import { useSignal, useModule } from '@/providers'
+import { useSignal } from '@/providers/SignalProvider'
+import { useModule } from '@/providers/ModuleProvider'
 import { DemandSignal } from '@prisma/client'
 import { X } from 'lucide-react'
 
 export function NewSignalPopup() {
   const { newSignals, setFocusSignal, clearNewSignals } = useSignal()
-  const { setActiveModule } = useModule()
+  const { setCurrentModule } = useModule()
 
   if (newSignals.length === 0) return null
 
@@ -14,7 +15,7 @@ export function NewSignalPopup() {
 
   const handleGoToMap = () => {
     setFocusSignal(currentSignal)
-    setActiveModule('map')
+    setCurrentModule('map')
     clearNewSignals()
   }
 
