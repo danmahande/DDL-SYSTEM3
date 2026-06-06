@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getRedisClient } from '@/lib/redis'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,6 +51,14 @@ export async function POST(request: Request) {
         privacyApplied: false,
       }
     })
+
+    // Save new signal to Redis for SSE broadcast
+    try {
+      const redis = getRedisClient()
+      await redis.set(`signal:${newSignal.id}`, JSON.stringify(newSignal), { ex: 3600 }) // Expire after 1 hour
+    } catch (e) {
+      console.error('Failed to save signal to Redis:', e)
+    }
 
     return NextResponse.json(
       { success: true, data: { signalId: newSignal.signalId } },

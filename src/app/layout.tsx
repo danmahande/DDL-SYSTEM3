@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { SignalProvider } from "@/providers/SignalProvider";
 
 export const metadata: Metadata = {
   title: "DDL Supplier Dashboard",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <SignalProvider>{children}</SignalProvider>
+        </AuthProvider>
       </body>
     </html>
   );

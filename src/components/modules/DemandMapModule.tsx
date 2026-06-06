@@ -23,6 +23,7 @@ import {
   MAPBOX_ACCESS_TOKEN,
   STYLE_OPTIONS,
 } from "@/lib/map-config";
+import { useSignal } from "@/providers/SignalProvider";
 
 // Set Mapbox access token
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
@@ -73,6 +74,7 @@ export default function DemandMapModule() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentStyle, setCurrentStyle] = useState<"DARK" | "STREETS" | "SATELLITE_STREETS" | "STANDARD">("STANDARD");
   const [signals, setSignals] = useState<DemandSignal[]>([]);
+  const { focusSignal, setFocusSignal } = useSignal();
 
   const fetchSignals = async () => {
     try {
@@ -97,13 +99,32 @@ export default function DemandMapModule() {
       if (signal.latitude && signal.longitude && activeLayers.signals) {
         const color = signal.urgency === "urgent" ? "#EF4444" : signal.urgency === "normal" ? "#F59E0B" : "#3B82F6";
         
-        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
-          <div style="padding: 8px;">
-            <h4 style="font-weight: bold; margin: 0 0 4px 0;">${signal.businessName || signal.signalId}</h4>
-            <p style="margin: 2px 0;">${signal.productLabel} (x${signal.quantity})</p>
-            <p style="margin: 2px 0; font-size: 12px; color: ${color};">${signal.urgency}</p>
+        // Create custom popup with buttons
+        const popup = new mapboxgl.Popup({ offset: 25 });
+        
+        // Use a div to render our content
+        const popupContent = document.createElement('div');
+        popupContent.innerHTML = `
+          <div style="padding: 12px; max-width: 240px;">
+            <h4 style="font-weight: bold; margin: 0 0 8px 0;">${signal.businessName || signal.signalId}</h4>
+            <p style="margin: 4px 0;">${signal.productLabel} (x${signal.quantity})</p>
+            <p style="margin: 4px 0; font-size: 12px; color: ${color};">${signal.urgency}</p>
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+              <button id="add-to-runsheet-${signal.id}" style="flex:1; padding:8px 12px; background:#FF6B35; color:white; border:none; border-radius:6px; cursor:pointer;">Add to Runsheet</button>
+              <button id="assign-driver-${signal.id}" style="flex:1; padding:8px 12px; background:#3B82F6; color:white; border:none; border-radius:6px; cursor:pointer;">Assign Driver</button>
+            </div>
           </div>
-        `);
+        `;
+        
+        // Add click handlers to buttons
+        popupContent.querySelector(`#add-to-runsheet-${signal.id}`)?.addEventListener('click', () => {
+          alert('Add to runsheet clicked for signal: ' + signal.signalId);
+        });
+        popupContent.querySelector(`#assign-driver-${signal.id}`)?.addEventListener('click', () => {
+          alert('Assign driver clicked for signal: ' + signal.signalId);
+        });
+        
+        popup.setDOMContent(popupContent);
 
         const marker = new mapboxgl.Marker({ color })
           .setLngLat([signal.longitude, signal.latitude])
@@ -255,6 +276,33 @@ export default function DemandMapModule() {
   const toggleLayer = (id: string) => {
     setActiveLayers((prev) => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // Handle focus signal
+  useEffect(() => {
+    if (map.current && focusSignal && focusSignal.latitude && focusSignal.longitude) {
+      map.current.flyTo({
+        center: [focusSignal.longitude, focusSignal.latitude],
+        zoom: 17,
+        pitch: KAMPALA_PITCH,
+        essential: true,
+      });
+
+      // Find and open the popup for the focus signal
+      const signalMarker = markers.current.find((marker) => {
+        const lngLat = marker.getLngLat();
+        return lngLat.lng === focusSignal.longitude && lngLat.lat === focusSignal.latitude;
+      });
+      
+      if (signalMarker) {
+        signalMarker.togglePopup();
+      }
+
+      // Clear focus signal after a moment
+      setTimeout(() => {
+        setFocusSignal(null);
+      }, 1000);
+    }
+  }, [focusSignal, setFocusSignal]);
 
   return (
     <div className="h-[calc(100vh-64px)] relative">

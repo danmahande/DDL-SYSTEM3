@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ModuleProvider, useModule } from "@/providers/ModuleProvider";
-import { AuthProvider } from "@/providers/AuthProvider";
+import { NewSignalPopup } from "@/components/auth/NewSignalPopup";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import DashboardModule from "@/components/modules/DashboardModule";
@@ -72,6 +72,7 @@ function AppLayout() {
         <Header onMobileMenuToggle={() => setMobileMenuOpen(true)} />
         <ModuleRenderer />
       </div>
+      <NewSignalPopup />
     </div>
   );
 }
