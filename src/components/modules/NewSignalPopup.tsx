@@ -82,12 +82,14 @@ export function NewSignalPopup() {
 
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={handleLater}
             className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
           >
             Later
           </button>
           <button
+            type="button"
             onClick={handleGoToMap}
             className="flex-1 px-4 py-2.5 rounded-xl bg-[#FF6B35] text-white font-semibold hover:bg-[#e05a2b] transition-colors shadow-lg shadow-[#FF6B35]/20"
           >
