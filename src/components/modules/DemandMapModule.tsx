@@ -194,6 +194,9 @@ export default function DemandMapModule() {
         markers.current.push(marker);
       }
     });
+
+    // Mark map as ready after markers are added
+    setMapReady(true);
   };
 
   // Nominatim search
@@ -314,6 +317,11 @@ export default function DemandMapModule() {
       addSignalMarkers();
     });
 
+    // Set map ready after initial load
+    map.current.on("load", () => {
+      setMapReady(true);
+    });
+
     map.current.on("styleimagemissing", (e) => {
       map.current?.addImage(e.id, new ImageData(1, 1));
     });
@@ -339,9 +347,12 @@ export default function DemandMapModule() {
     setActiveLayers((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Track if map is fully loaded with markers
+  const [mapReady, setMapReady] = useState(false);
+
   // Handle focus signal
   useEffect(() => {
-    if (map.current && focusSignal && focusSignal.latitude && focusSignal.longitude) {
+    if (map.current && mapReady && focusSignal && focusSignal.latitude && focusSignal.longitude) {
       map.current.flyTo({
         center: [focusSignal.longitude, focusSignal.latitude],
         zoom: 17,
@@ -359,12 +370,12 @@ export default function DemandMapModule() {
         signalMarker.togglePopup();
       }
 
-      // Clear focus signal after a moment
+      // Clear focus signal after user has time to see
       setTimeout(() => {
         setFocusSignal(null);
-      }, 1000);
+      }, 3000);
     }
-  }, [focusSignal, setFocusSignal]);
+  }, [focusSignal, setFocusSignal, mapReady]);
 
   return (
     <div className="h-[calc(100vh-64px)] relative">
