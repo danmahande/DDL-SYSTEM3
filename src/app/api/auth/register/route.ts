@@ -4,18 +4,30 @@ import prisma from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const { name, email, password } = await request.json();
 
-    const user = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
-    if (!user || !bcrypt.compareSync(password, user.password)) {
+    if (existingUser) {
       return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
+        { error: "User already exists with this email" },
+        { status: 400 }
       );
     }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: "viewer",
+        isActive: true,
+      },
+    });
 
     const sessionData = {
       id: user.id,
@@ -38,7 +50,7 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Register error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
