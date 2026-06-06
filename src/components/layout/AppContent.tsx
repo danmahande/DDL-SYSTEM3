@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ModuleProvider, useModule } from "@/providers/ModuleProvider";
-import { NewSignalPopup } from "@/components/auth/NewSignalPopup";
+import { SignalProvider } from "@/providers/SignalProvider";
+import { NewSignalPopup } from "@/components/modules/NewSignalPopup";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import DashboardModule from "@/components/modules/DashboardModule";
@@ -79,8 +80,10 @@ function AppLayout() {
 
 export default function AppContent() {
   return (
-    <ModuleProvider>
-      <AppLayout />
-    </ModuleProvider>
+    <SignalProvider>
+      <ModuleProvider>
+        <AppLayout />
+      </ModuleProvider>
+    </SignalProvider>
   );
 }

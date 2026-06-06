@@ -72,6 +72,11 @@ model DemandSignal {
   isSynced        Boolean  @default(false)
   syncedAt        DateTime?
   privacyApplied  Boolean  @default(false)
+  driverId        String?
+  driver          Driver?  @relation(fields: [driverId], references: [id])
+  routeId         String?
+  route           Route?   @relation(fields: [routeId], references: [id])
+  assignedAt      DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -114,10 +119,12 @@ model Route {
   stopsCount      Int      @default(0)
   completedStops  Int      @default(0)
   status          String   @default("planned") // planned, active, completed
+  isActive        Boolean  @default(false)
   optimizationData String? // stored as string
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   stops           RouteStop[]
+  demandSignals   DemandSignal[]
 }
 
 model RouteStop {
@@ -144,6 +151,7 @@ model Driver {
   phone           String
   vehicleNumber   String?
   licenseNumber   String?
+  photoUrl        String?
   status          String   @default("active") // active, on_delivery, on_leave, inactive
   currentLatitude Float?
   currentLongitude Float?
@@ -151,6 +159,7 @@ model Driver {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   routes          Route[]
+  demandSignals   DemandSignal[]
 }
 
 model Setting {

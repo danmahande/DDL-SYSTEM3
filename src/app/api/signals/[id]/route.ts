@@ -16,12 +16,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const body = await request.json()
     
+    const updateData: any = {
+      updatedAt: new Date(),
+    }
+    
+    if (body.status) {
+      updateData.status = body.status
+    }
+    if (body.driverId) {
+      updateData.driverId = body.driverId
+      updateData.status = 'assigned'
+      updateData.assignedAt = new Date()
+    }
+    if (body.routeId) {
+      updateData.routeId = body.routeId
+    }
+
     const updatedSignal = await prisma.demandSignal.update({
       where: { id },
-      data: {
-        status: body.status,
-        updatedAt: new Date(),
-      }
+      data: updateData,
     })
 
     return NextResponse.json(

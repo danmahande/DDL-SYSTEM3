@@ -15,6 +15,7 @@ import {
   Target,
   Image as ImageIcon,
   Map as MapIcon,
+  X,
 } from "lucide-react";
 import {
   KAMPALA_ZOOM,
@@ -24,6 +25,7 @@ import {
   STYLE_OPTIONS,
 } from "@/lib/map-config";
 import { useSignal } from "@/providers/SignalProvider";
+import { DemandSignal, Driver, Route } from "@prisma/client";
 
 // Set Mapbox access token
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
@@ -41,17 +43,6 @@ interface SearchResult {
   display_name: string;
   lat: string;
   lon: string;
-}
-
-interface DemandSignal {
-  id: string;
-  signalId: string;
-  businessName: string;
-  productLabel: string;
-  quantity: number;
-  urgency: string;
-  latitude: number | null;
-  longitude: number | null;
 }
 
 const BUGOLOBI_CENTER: [number, number] = [32.6106, 0.3132];
@@ -74,6 +65,9 @@ export default function DemandMapModule() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentStyle, setCurrentStyle] = useState<"DARK" | "STREETS" | "SATELLITE_STREETS" | "STANDARD">("STANDARD");
   const [signals, setSignals] = useState<DemandSignal[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [runsheets, setRunsheets] = useState<Route[]>([]);
+  const [showAssignDriverModal, setShowAssignDriverModal] = useState<DemandSignal | null>(null);
   const { focusSignal, setFocusSignal } = useSignal();
 
   const fetchSignals = async () => {
@@ -85,6 +79,61 @@ export default function DemandMapModule() {
       }
     } catch (error) {
       console.error("Error fetching signals:", error);
+    }
+  };
+
+  const fetchDrivers = async () => {
+    try {
+      const res = await fetch("/api/drivers");
+      const data = await res.json();
+      if (data.success) {
+        setDrivers(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching drivers:", error);
+    }
+  };
+
+  const fetchRunsheets = async () => {
+    try {
+      const res = await fetch("/api/runsheets");
+      const data = await res.json();
+      if (data.success) {
+        setRunsheets(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching runsheets:", error);
+    }
+  };
+
+  const activeRunsheet = runsheets.find(r => r.isActive);
+
+  const handleAssignDriver = async (driverId: string) => {
+    if (!showAssignDriverModal) return;
+    try {
+      await fetch(`/api/signals/${showAssignDriverModal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId }),
+      });
+      setShowAssignDriverModal(null);
+      fetchSignals();
+    } catch (e) {
+      console.error("Error assigning driver:", e);
+    }
+  };
+
+  const handleAddToRunsheet = async (signal: DemandSignal) => {
+    if (!activeRunsheet) return;
+    try {
+      await fetch(`/api/signals/${signal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ routeId: activeRunsheet.id }),
+      });
+      fetchSignals();
+    } catch (e) {
+      console.error("Error adding to runsheet:", e);
     }
   };
 
@@ -109,20 +158,31 @@ export default function DemandMapModule() {
             <h4 style="font-weight: bold; margin: 0 0 8px 0;">${signal.businessName || signal.signalId}</h4>
             <p style="margin: 4px 0;">${signal.productLabel} (x${signal.quantity})</p>
             <p style="margin: 4px 0; font-size: 12px; color: ${color};">${signal.urgency}</p>
-            <div style="margin-top: 12px; display: flex; gap: 8px;">
-              <button id="add-to-runsheet-${signal.id}" style="flex:1; padding:8px 12px; background:#FF6B35; color:white; border:none; border-radius:6px; cursor:pointer;">Add to Runsheet</button>
-              <button id="assign-driver-${signal.id}" style="flex:1; padding:8px 12px; background:#3B82F6; color:white; border:none; border-radius:6px; cursor:pointer;">Assign Driver</button>
+            <div style="margin-top: 12px; display: flex; gap: 8px; flex-direction: column;">
+              ${activeRunsheet ? `<button id="add-to-runsheet-${signal.id}" style="width:100%; padding:8px 12px; background:#FF6B35; color:white; border:none; border-radius:6px; cursor:pointer;">Add to Runsheet</button>` : ''}
+              <button id="assign-driver-${signal.id}" style="width:100%; padding:8px 12px; background:#3B82F6; color:white; border:none; border-radius:6px; cursor:pointer;">Assign Driver</button>
             </div>
           </div>
         `;
         
         // Add click handlers to buttons
-        popupContent.querySelector(`#add-to-runsheet-${signal.id}`)?.addEventListener('click', () => {
-          alert('Add to runsheet clicked for signal: ' + signal.signalId);
-        });
-        popupContent.querySelector(`#assign-driver-${signal.id}`)?.addEventListener('click', () => {
-          alert('Assign driver clicked for signal: ' + signal.signalId);
-        });
+        const addBtn = popupContent.querySelector(`#add-to-runsheet-${signal.id}`);
+        if (addBtn) {
+          addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleAddToRunsheet(signal);
+            popup.remove();
+          });
+        }
+        
+        const assignBtn = popupContent.querySelector(`#assign-driver-${signal.id}`);
+        if (assignBtn) {
+          assignBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setShowAssignDriverModal(signal);
+            popup.remove();
+          });
+        }
         
         popup.setDOMContent(popupContent);
 
@@ -210,6 +270,8 @@ export default function DemandMapModule() {
 
   useEffect(() => {
     fetchSignals();
+    fetchDrivers();
+    fetchRunsheets();
   }, []);
 
   useEffect(() => {
@@ -263,7 +325,7 @@ export default function DemandMapModule() {
 
   useEffect(() => {
     addSignalMarkers();
-  }, [signals, activeLayers.signals]);
+  }, [signals, activeLayers.signals, runsheets]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -442,6 +504,57 @@ export default function DemandMapModule() {
           </div>
         )}
       </div>
+
+      {/* Assign Driver Modal */}
+      {showAssignDriverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Assign Driver</h3>
+              <button
+                onClick={() => setShowAssignDriverModal(null)}
+                className="p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="mb-4 text-sm text-gray-600">
+              <p className="font-medium text-gray-900">{showAssignDriverModal.businessName}</p>
+              <p>{showAssignDriverModal.productLabel} (x{showAssignDriverModal.quantity})</p>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {drivers
+                .filter(d => d.status === "active")
+                .map(driver => (
+                  <button
+                    key={driver.id}
+                    onClick={() => handleAssignDriver(driver.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:bg-orange-50 transition-colors"
+                  >
+                    {driver.photoUrl ? (
+                      <img
+                        src={driver.photoUrl}
+                        alt={driver.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold">
+                        {driver.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-gray-900">{driver.name}</p>
+                      <p className="text-sm text-gray-500">{driver.phone}</p>
+                    </div>
+                  </button>
+                ))}
+              {drivers.filter(d => d.status === "active").length === 0 && (
+                <div className="text-center py-6 text-gray-500">No active drivers available</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

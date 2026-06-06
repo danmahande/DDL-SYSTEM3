@@ -18,39 +18,30 @@ export async function GET(request: Request) {
     const category = searchParams.get('category')
     const neighborhood = searchParams.get('neighborhood')
     const urgency = searchParams.get('urgency')
+    const recent = searchParams.get('recent') === 'true'
 
     const where: any = {}
     if (category) where.productCategory = category
     if (neighborhood) where.neighborhood = neighborhood
     if (urgency) where.urgency = urgency
 
-    const [signals, stats] = await Promise.all([
-      prisma.demandSignal.findMany({
-        where,
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.demandSignal.aggregate({
-        _count: {
-          id: true,
-        },
-        where: {
-          status: {
-            in: ['pending', 'assigned', 'in_transit', 'delivered']
-          }
-        }
-      })
-    ])
+    const signals = await prisma.demandSignal.findMany({
+      where,
+      orderBy: { createdAt: 'desc' }
+    })
 
-    const total = signals.length
-    const pending = signals.filter((s: DemandSignal) => s.status === 'pending').length
-    const active = signals.filter((s: DemandSignal) => ['assigned', 'in_transit'].includes(s.status)).length
-    const delivered = signals.filter((s: DemandSignal) => s.status === 'delivered').length
+    const stats = {
+      total: signals.length,
+      pending: signals.filter((s: DemandSignal) => s.status === 'pending').length,
+      active: signals.filter((s: DemandSignal) => ['assigned', 'in_transit'].includes(s.status)).length,
+      delivered: signals.filter((s: DemandSignal) => s.status === 'delivered').length,
+    }
 
     return NextResponse.json(
       { 
         success: true, 
         data: signals,
-        stats: { total, pending, active, delivered }
+        stats
       },
       { headers: corsHeaders }
     )

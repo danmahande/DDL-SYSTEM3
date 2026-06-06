@@ -1,7 +1,8 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { DemandSignal } from '@prisma/client'
+import { useAuth } from './AuthProvider'
 
 interface SignalContextType {
   newSignals: DemandSignal[]
@@ -14,19 +15,59 @@ interface SignalContextType {
 const SignalContext = createContext<SignalContextType | null>(null)
 
 export function SignalProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [newSignals, setNewSignals] = useState<DemandSignal[]>([])
   const [focusSignal, setFocusSignal] = useState<DemandSignal | null>(null)
+  const shownSignalIds = useRef<Set<string>>(new Set())
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const playNotificationSound = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3')
+      audioRef.current.volume = 0.5
+    }
+    audioRef.current.play().catch(e => console.error('Error playing sound:', e))
+  }
 
   const addNewSignal = (signal: DemandSignal) => {
-    setNewSignals(prev => [...prev, signal])
+    if (!shownSignalIds.current.has(signal.id)) {
+      shownSignalIds.current.add(signal.id)
+      setNewSignals(prev => [...prev, signal])
+      playNotificationSound()
+    }
   }
 
   const clearNewSignals = () => {
     setNewSignals([])
   }
 
+  const fetchRecentSignals = async () => {
+    try {
+      const res = await fetch('/api/signals?recent=true')
+      const data = await res.json()
+      if (data.success && data.data) {
+        const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        data.data
+          .filter((s: DemandSignal) => new Date(s.createdAt) > last24Hours)
+          .forEach((s: DemandSignal) => addNewSignal(s))
+      }
+    } catch (e) {
+      console.error('Error fetching recent signals:', e)
+    }
+  }
+
   useEffect(() => {
-    // Only connect to SSE if user is logged in (we'll check auth later)
+    if (user) {
+      fetchRecentSignals()
+    } else {
+      setNewSignals([])
+      shownSignalIds.current.clear()
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+
     const eventSource = new EventSource('/api/signals/stream')
 
     eventSource.onmessage = (event) => {
@@ -44,7 +85,7 @@ export function SignalProvider({ children }: { children: ReactNode }) {
     return () => {
       eventSource.close()
     }
-  }, [])
+  }, [user])
 
   return (
     <SignalContext.Provider
