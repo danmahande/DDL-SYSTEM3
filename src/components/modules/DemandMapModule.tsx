@@ -412,21 +412,21 @@ export default function DemandMapModule() {
       <div ref={mapContainer} className="w-full h-full" />
 
       {/* Search Bar */}
-      <div className="absolute top-4 left-4 z-10 w-[480px]">
-        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden border border-white/10">
+      <div className="absolute top-4 left-4 z-10 w-[480px] pointer-events-none">
+        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden border border-white/10 pointer-events-auto">
           <div className="flex items-center gap-3 px-5 py-4">
             <Search className="w-6 h-6 text-gray-400" />
             <input
               type="text"
               placeholder="Search all buildings, streets, and locations in Kampala..."
-              className="flex-1 px-3 py-1 text-base outline-none bg-transparent text-white placeholder-gray-400"
+              className="flex-1 px-3 py-1 text-base outline-none bg-transparent text-white placeholder-gray-400 pointer-events-auto"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
             />
             <button
               onClick={handleGeolocate}
-              className="p-2 hover:bg-white/10 rounded-xl"
+              className="p-2 hover:bg-white/10 rounded-xl pointer-events-auto"
               title="Use my location"
             >
               <Target className="w-6 h-6 text-gray-300" />
@@ -453,8 +453,8 @@ export default function DemandMapModule() {
       </div>
 
       {/* Style Switcher */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl border border-white/10 overflow-hidden flex">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl border border-white/10 overflow-hidden flex pointer-events-auto">
           <button
             onClick={() => switchStyle("DARK")}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
@@ -503,10 +503,10 @@ export default function DemandMapModule() {
       </div>
 
       {/* Layer Controls */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 pointer-events-none">
         <button
           onClick={() => setShowControls(!showControls)}
-          className="bg-[#1B2A4A]/95 backdrop-blur rounded-xl shadow-xl p-3 mb-3 border border-white/10"
+          className="bg-[#1B2A4A]/95 backdrop-blur rounded-xl shadow-xl p-3 mb-3 border border-white/10 pointer-events-auto"
         >
           {showControls ? (
             <EyeOff className="w-6 h-6 text-gray-200" />
@@ -516,7 +516,7 @@ export default function DemandMapModule() {
         </button>
 
         {showControls && (
-          <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl p-5 w-72 border border-white/10">
+          <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl p-5 w-72 border border-white/10 pointer-events-auto">
             <h3 className="font-bold text-gray-100 mb-4 flex items-center gap-2 text-lg">
               <Layers className="w-5 h-5" /> Map Layers
             </h3>
