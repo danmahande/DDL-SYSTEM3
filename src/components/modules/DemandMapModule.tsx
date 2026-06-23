@@ -280,6 +280,12 @@ export default function DemandMapModule() {
   useEffect(() => {
     if (!mapContainer.current) return;
 
+    // Ensure the container allows pointer events
+    if (mapContainer.current) {
+      mapContainer.current.style.pointerEvents = "auto";
+      mapContainer.current.style.touchAction = "auto";
+    }
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: STYLE_OPTIONS[currentStyle], // Use the configured style options that will use the token
@@ -288,6 +294,15 @@ export default function DemandMapModule() {
       pitch: KAMPALA_PITCH,
       bearing: KAMPALA_BEARING,
       antialias: true,
+      // Explicitly enable user interactions so mouse drag/scroll/touch work
+      dragPan: true,
+      dragRotate: true,
+      scrollZoom: true,
+      doubleClickZoom: true,
+      boxZoom: true,
+      touchZoomRotate: true,
+      keyboard: true,
+      interactive: true,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
@@ -315,6 +330,21 @@ export default function DemandMapModule() {
         }
       }
       addSignalMarkers();
+    });
+
+    // Ensure common interaction handlers are enabled after style loads
+    map.current.on('load', () => {
+      try {
+        map.current?.dragPan?.enable();
+        map.current?.dragRotate?.enable();
+        map.current?.scrollZoom?.enable();
+        map.current?.doubleClickZoom?.enable();
+        map.current?.boxZoom?.enable();
+        map.current?.touchZoomRotate?.enable();
+        map.current?.keyboard?.enable?.();
+      } catch (e) {
+        // Some handlers may not be present depending on the Mapbox version
+      }
     });
 
     // Set map ready after initial load
