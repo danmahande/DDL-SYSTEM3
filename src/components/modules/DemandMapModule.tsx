@@ -454,6 +454,58 @@ export default function DemandMapModule() {
       } catch (e) {}
     };
 
+    // Auto temporary passthrough on pointerdown inside the map: disable pointer-events
+    // on overlapping elements while the pointer is pressed so the map can receive drag.
+    const tempDisabled: { el: Element; prev: string }[] = [];
+    let pointerDownActive = false;
+
+    const onPointerDown = (ev: PointerEvent) => {
+      // Only act for primary button
+      if (ev.button !== 0) return;
+      const rect = mapContainer.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = ev.clientX, y = ev.clientY;
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
+
+      pointerDownActive = true;
+      const elements = Array.from(document.body.querySelectorAll('*')) as Element[];
+      elements.forEach((el) => {
+        try {
+          if (el === mapContainer.current) return;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          const intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
+          if (!intersects) return;
+          const prev = (el as HTMLElement).style.pointerEvents || '';
+          (el as HTMLElement).style.pointerEvents = 'none';
+          tempDisabled.push({ el, prev });
+        } catch (e) {}
+      });
+    };
+
+    const onPointerUp = () => {
+      if (!pointerDownActive) return;
+      pointerDownActive = false;
+      tempDisabled.forEach(({ el, prev }) => {
+        try {
+          (el as HTMLElement).style.pointerEvents = prev;
+        } catch (e) {}
+      });
+      tempDisabled.length = 0;
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('pointerup', onPointerUp);
+
+    // ensure cleanup
+    const cleanupAll = () => {
+      try {
+        cleanupForce();
+        document.removeEventListener('pointerdown', onPointerDown);
+        document.removeEventListener('pointerup', onPointerUp);
+      } catch (e) {}
+    };
+
 
     return () => {
       map.current?.remove();
