@@ -356,6 +356,37 @@ export default function DemandMapModule() {
       map.current?.addImage(e.id, new ImageData(1, 1));
     });
 
+    // Debug helper: if URL contains ?mapdebug=1, outline elements overlapping the map
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('mapdebug') === '1') {
+        setTimeout(() => {
+          const rect = mapContainer.current?.getBoundingClientRect();
+          if (!rect) return;
+          const overlapping: Element[] = [];
+          const elements = Array.from(document.body.querySelectorAll('*')) as Element[];
+          elements.forEach((el) => {
+            try {
+              const r = el.getBoundingClientRect();
+              if (!r.width || !r.height) return;
+              const intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
+              if (intersects) overlapping.push(el);
+            } catch (e) {}
+          });
+
+          console.log('Map debug - overlapping elements count:', overlapping.length);
+          overlapping.forEach((el, i) => {
+            (el as HTMLElement).style.outline = '2px solid rgba(255,0,0,0.9)';
+            (el as HTMLElement).style.outlineOffset = '-2px';
+            (el as HTMLElement).setAttribute('data-map-debug', `overlap-${i}`);
+            console.log(i, el, el.tagName, el.className, getComputedStyle(el).pointerEvents);
+          });
+        }, 800);
+      }
+    } catch (e) {
+      // ignore in SSR or non-browser contexts
+    }
+
     return () => {
       map.current?.remove();
     };
