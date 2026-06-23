@@ -280,12 +280,6 @@ export default function DemandMapModule() {
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Ensure the container allows pointer events
-    if (mapContainer.current) {
-      mapContainer.current.style.pointerEvents = "auto";
-      mapContainer.current.style.touchAction = "auto";
-    }
-
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: STYLE_OPTIONS[currentStyle], // Use the configured style options that will use the token
@@ -294,15 +288,6 @@ export default function DemandMapModule() {
       pitch: KAMPALA_PITCH,
       bearing: KAMPALA_BEARING,
       antialias: true,
-      // Explicitly enable user interactions so mouse drag/scroll/touch work
-      dragPan: true,
-      dragRotate: true,
-      scrollZoom: true,
-      doubleClickZoom: true,
-      boxZoom: true,
-      touchZoomRotate: true,
-      keyboard: true,
-      interactive: true,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
@@ -332,21 +317,6 @@ export default function DemandMapModule() {
       addSignalMarkers();
     });
 
-    // Ensure common interaction handlers are enabled after style loads
-    map.current.on('load', () => {
-      try {
-        map.current?.dragPan?.enable();
-        map.current?.dragRotate?.enable();
-        map.current?.scrollZoom?.enable();
-        map.current?.doubleClickZoom?.enable();
-        map.current?.boxZoom?.enable();
-        map.current?.touchZoomRotate?.enable();
-        map.current?.keyboard?.enable?.();
-      } catch (e) {
-        // Some handlers may not be present depending on the Mapbox version
-      }
-    });
-
     // Set map ready after initial load
     map.current.on("load", () => {
       setMapReady(true);
@@ -355,157 +325,6 @@ export default function DemandMapModule() {
     map.current.on("styleimagemissing", (e) => {
       map.current?.addImage(e.id, new ImageData(1, 1));
     });
-
-    // Debug helper: if URL contains ?mapdebug=1, outline elements overlapping the map
-    try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('mapdebug') === '1') {
-        setTimeout(() => {
-          const rect = mapContainer.current?.getBoundingClientRect();
-          if (!rect) return;
-          const overlapping: Element[] = [];
-          const elements = Array.from(document.body.querySelectorAll('*')) as Element[];
-          elements.forEach((el) => {
-            try {
-              const r = el.getBoundingClientRect();
-              if (!r.width || !r.height) return;
-              const intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
-              if (intersects) overlapping.push(el);
-            } catch (e) {}
-          });
-
-          console.log('Map debug - overlapping elements count:', overlapping.length);
-          overlapping.forEach((el, i) => {
-            (el as HTMLElement).style.outline = '2px solid rgba(255,0,0,0.9)';
-            (el as HTMLElement).style.outlineOffset = '-2px';
-            (el as HTMLElement).setAttribute('data-map-debug', `overlap-${i}`);
-            console.log(i, el, el.tagName, el.className, getComputedStyle(el).pointerEvents);
-          });
-        }, 800);
-      }
-    } catch (e) {
-      // ignore in SSR or non-browser contexts
-    }
-
-    // Temporary toggle to force-enable map dragging by disabling pointer-events
-    const forceBtn = document.createElement('button');
-    forceBtn.textContent = 'Enable Map Drag';
-    forceBtn.style.position = 'fixed';
-    forceBtn.style.right = '16px';
-    forceBtn.style.bottom = '16px';
-    forceBtn.style.zIndex = '999999';
-    forceBtn.style.padding = '10px 12px';
-    forceBtn.style.borderRadius = '999px';
-    forceBtn.style.background = '#FF6B35';
-    forceBtn.style.color = 'white';
-    forceBtn.style.border = 'none';
-    forceBtn.style.cursor = 'pointer';
-    forceBtn.setAttribute('data-map-drag-toggle', '0');
-
-    let disabledEls: { el: Element; prev: string }[] = [];
-
-    const toggleForce = () => {
-      const state = forceBtn.getAttribute('data-map-drag-toggle') === '1';
-      if (!state) {
-        // Disable pointer events for overlapping non-interactive elements
-        const rect = mapContainer.current?.getBoundingClientRect();
-        if (!rect) return;
-        const elements = Array.from(document.body.querySelectorAll('*')) as Element[];
-        elements.forEach((el) => {
-          try {
-            if (el === mapContainer.current) return;
-            const r = el.getBoundingClientRect();
-            if (!r.width || !r.height) return;
-            const intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
-            if (!intersects) return;
-            // Skip interactive elements
-            const tag = el.tagName;
-            const role = el.getAttribute('role');
-            if (['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(tag)) return;
-            if (role && ['button', 'link', 'checkbox', 'menuitem', 'tab'].includes(role)) return;
-            const prev = (el as HTMLElement).style.pointerEvents || '';
-            (el as HTMLElement).style.pointerEvents = 'none';
-            disabledEls.push({ el, prev });
-          } catch (e) {}
-        });
-        forceBtn.textContent = 'Disable Map Drag (Restore)';
-        forceBtn.setAttribute('data-map-drag-toggle', '1');
-      } else {
-        // Restore
-        disabledEls.forEach(({ el, prev }) => {
-          try {
-            (el as HTMLElement).style.pointerEvents = prev;
-          } catch (e) {}
-        });
-        disabledEls = [];
-        forceBtn.textContent = 'Enable Map Drag';
-        forceBtn.setAttribute('data-map-drag-toggle', '0');
-      }
-    };
-
-    forceBtn.addEventListener('click', toggleForce);
-    document.body.appendChild(forceBtn);
-
-    // Clean up
-    const cleanupForce = () => {
-      try {
-        forceBtn.removeEventListener('click', toggleForce);
-        forceBtn.remove();
-      } catch (e) {}
-    };
-
-    // Auto temporary passthrough on pointerdown inside the map: disable pointer-events
-    // on overlapping elements while the pointer is pressed so the map can receive drag.
-    const tempDisabled: { el: Element; prev: string }[] = [];
-    let pointerDownActive = false;
-
-    const onPointerDown = (ev: PointerEvent) => {
-      // Only act for primary button
-      if (ev.button !== 0) return;
-      const rect = mapContainer.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = ev.clientX, y = ev.clientY;
-      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
-
-      pointerDownActive = true;
-      const elements = Array.from(document.body.querySelectorAll('*')) as Element[];
-      elements.forEach((el) => {
-        try {
-          if (el === mapContainer.current) return;
-          const r = el.getBoundingClientRect();
-          if (!r.width || !r.height) return;
-          const intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
-          if (!intersects) return;
-          const prev = (el as HTMLElement).style.pointerEvents || '';
-          (el as HTMLElement).style.pointerEvents = 'none';
-          tempDisabled.push({ el, prev });
-        } catch (e) {}
-      });
-    };
-
-    const onPointerUp = () => {
-      if (!pointerDownActive) return;
-      pointerDownActive = false;
-      tempDisabled.forEach(({ el, prev }) => {
-        try {
-          (el as HTMLElement).style.pointerEvents = prev;
-        } catch (e) {}
-      });
-      tempDisabled.length = 0;
-    };
-
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('pointerup', onPointerUp);
-
-    // ensure cleanup
-    const cleanupAll = () => {
-      try {
-        cleanupForce();
-        document.removeEventListener('pointerdown', onPointerDown);
-        document.removeEventListener('pointerup', onPointerUp);
-      } catch (e) {}
-    };
-
 
     return () => {
       map.current?.remove();
@@ -563,21 +382,21 @@ export default function DemandMapModule() {
       <div ref={mapContainer} className="w-full h-full" />
 
       {/* Search Bar */}
-      <div className="absolute top-4 left-4 z-10 w-[480px] pointer-events-none">
-        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden border border-white/10 pointer-events-auto">
+      <div className="absolute top-4 left-4 z-10 w-[480px]">
+        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden border border-white/10">
           <div className="flex items-center gap-3 px-5 py-4">
             <Search className="w-6 h-6 text-gray-400" />
             <input
               type="text"
               placeholder="Search all buildings, streets, and locations in Kampala..."
-              className="flex-1 px-3 py-1 text-base outline-none bg-transparent text-white placeholder-gray-400 pointer-events-auto"
+              className="flex-1 px-3 py-1 text-base outline-none bg-transparent text-white placeholder-gray-400"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
             />
             <button
               onClick={handleGeolocate}
-              className="p-2 hover:bg-white/10 rounded-xl pointer-events-auto"
+              className="p-2 hover:bg-white/10 rounded-xl"
               title="Use my location"
             >
               <Target className="w-6 h-6 text-gray-300" />
@@ -604,8 +423,8 @@ export default function DemandMapModule() {
       </div>
 
       {/* Style Switcher */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl border border-white/10 overflow-hidden flex pointer-events-auto">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+        <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl border border-white/10 overflow-hidden flex">
           <button
             onClick={() => switchStyle("DARK")}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
@@ -654,10 +473,10 @@ export default function DemandMapModule() {
       </div>
 
       {/* Layer Controls */}
-      <div className="absolute top-4 right-4 z-10 pointer-events-none">
+      <div className="absolute top-4 right-4 z-10">
         <button
           onClick={() => setShowControls(!showControls)}
-          className="bg-[#1B2A4A]/95 backdrop-blur rounded-xl shadow-xl p-3 mb-3 border border-white/10 pointer-events-auto"
+          className="bg-[#1B2A4A]/95 backdrop-blur rounded-xl shadow-xl p-3 mb-3 border border-white/10"
         >
           {showControls ? (
             <EyeOff className="w-6 h-6 text-gray-200" />
@@ -667,7 +486,7 @@ export default function DemandMapModule() {
         </button>
 
         {showControls && (
-          <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl p-5 w-72 border border-white/10 pointer-events-auto">
+          <div className="bg-[#1B2A4A]/95 backdrop-blur rounded-2xl shadow-xl p-5 w-72 border border-white/10">
             <h3 className="font-bold text-gray-100 mb-4 flex items-center gap-2 text-lg">
               <Layers className="w-5 h-5" /> Map Layers
             </h3>
