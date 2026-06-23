@@ -387,6 +387,74 @@ export default function DemandMapModule() {
       // ignore in SSR or non-browser contexts
     }
 
+    // Temporary toggle to force-enable map dragging by disabling pointer-events
+    const forceBtn = document.createElement('button');
+    forceBtn.textContent = 'Enable Map Drag';
+    forceBtn.style.position = 'fixed';
+    forceBtn.style.right = '16px';
+    forceBtn.style.bottom = '16px';
+    forceBtn.style.zIndex = '999999';
+    forceBtn.style.padding = '10px 12px';
+    forceBtn.style.borderRadius = '999px';
+    forceBtn.style.background = '#FF6B35';
+    forceBtn.style.color = 'white';
+    forceBtn.style.border = 'none';
+    forceBtn.style.cursor = 'pointer';
+    forceBtn.setAttribute('data-map-drag-toggle', '0');
+
+    let disabledEls: { el: Element; prev: string }[] = [];
+
+    const toggleForce = () => {
+      const state = forceBtn.getAttribute('data-map-drag-toggle') === '1';
+      if (!state) {
+        // Disable pointer events for overlapping non-interactive elements
+        const rect = mapContainer.current?.getBoundingClientRect();
+        if (!rect) return;
+        const elements = Array.from(document.body.querySelectorAll('*')) as Element[];
+        elements.forEach((el) => {
+          try {
+            if (el === mapContainer.current) return;
+            const r = el.getBoundingClientRect();
+            if (!r.width || !r.height) return;
+            const intersects = !(r.right < rect.left || r.left > rect.right || r.bottom < rect.top || r.top > rect.bottom);
+            if (!intersects) return;
+            // Skip interactive elements
+            const tag = el.tagName;
+            const role = el.getAttribute('role');
+            if (['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(tag)) return;
+            if (role && ['button', 'link', 'checkbox', 'menuitem', 'tab'].includes(role)) return;
+            const prev = (el as HTMLElement).style.pointerEvents || '';
+            (el as HTMLElement).style.pointerEvents = 'none';
+            disabledEls.push({ el, prev });
+          } catch (e) {}
+        });
+        forceBtn.textContent = 'Disable Map Drag (Restore)';
+        forceBtn.setAttribute('data-map-drag-toggle', '1');
+      } else {
+        // Restore
+        disabledEls.forEach(({ el, prev }) => {
+          try {
+            (el as HTMLElement).style.pointerEvents = prev;
+          } catch (e) {}
+        });
+        disabledEls = [];
+        forceBtn.textContent = 'Enable Map Drag';
+        forceBtn.setAttribute('data-map-drag-toggle', '0');
+      }
+    };
+
+    forceBtn.addEventListener('click', toggleForce);
+    document.body.appendChild(forceBtn);
+
+    // Clean up
+    const cleanupForce = () => {
+      try {
+        forceBtn.removeEventListener('click', toggleForce);
+        forceBtn.remove();
+      } catch (e) {}
+    };
+
+
     return () => {
       map.current?.remove();
     };
