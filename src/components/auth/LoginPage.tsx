@@ -6,7 +6,7 @@ import { Package, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 
 interface LoginPageProps {
-  onSwitchToRegister: () => void;
+  onSwitchToRegister?: () => void;
 }
 
 export default function LoginPage({ onSwitchToRegister }: LoginPageProps) {
@@ -90,9 +90,19 @@ export default function LoginPage({ onSwitchToRegister }: LoginPageProps) {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-blue-200/60 text-sm">
-            <p>Don't have an account? <button onClick={onSwitchToRegister} className="text-orange-400 hover:text-orange-300 font-medium">Create Account</button></p>
-          </div>
+          {onSwitchToRegister && (
+            <div className="mt-6 text-center text-blue-200/60 text-sm">
+              <p>
+                Don&apos;t have an account?{" "}
+                <button
+                  onClick={onSwitchToRegister}
+                  className="text-orange-400 hover:text-orange-300 font-medium"
+                >
+                  Create Account
+                </button>
+              </p>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

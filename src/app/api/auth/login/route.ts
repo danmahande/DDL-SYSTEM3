@@ -1,39 +1,53 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
+import {
+  createSessionToken,
+  getSessionCookieOptions,
+  toPublicSessionUser,
+} from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
 
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: "Email and password are required" },
+        { status: 400 }
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
-    if (!user || !bcrypt.compareSync(password, user.password)) {
+    if (!user || !user.isActive || !bcrypt.compareSync(password, user.password)) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
       );
     }
 
-    const sessionData = {
+    const sessionUser = toPublicSessionUser({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       exp: Date.now() + 24 * 60 * 60 * 1000,
-    };
+    });
 
-    const sessionCookie = btoa(JSON.stringify(sessionData));
+    const sessionToken = await createSessionToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    });
 
-    const response = NextResponse.json({ user: sessionData });
+    const response = NextResponse.json({ user: sessionUser });
     response.cookies.set({
-      name: "ddl-session",
-      value: sessionCookie,
-      httpOnly: true,
-      path: "/",
-      maxAge: 60 * 60 * 24,
+      ...getSessionCookieOptions(),
+      value: sessionToken,
     });
 
     return response;

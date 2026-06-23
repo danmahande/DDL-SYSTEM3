@@ -1,40 +1,32 @@
-import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma from "@/lib/prisma";
+import { jsonWithCors } from "@/lib/auth";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+export async function OPTIONS(request: Request) {
+  return jsonWithCors({}, request);
 }
 
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders })
-}
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const drivers = await prisma.driver.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: { routes: true },
-    })
-    return NextResponse.json(
-      { success: true, data: drivers },
-      { headers: corsHeaders }
-    )
+    });
+    return jsonWithCors({ success: true, data: drivers }, request);
   } catch (error) {
-    console.error('Error fetching drivers:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch drivers' },
-      { status: 500, headers: corsHeaders }
-    )
+    console.error("Error fetching drivers:", error);
+    return jsonWithCors(
+      { success: false, error: "Failed to fetch drivers" },
+      request,
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const driverId = `DRV-${Date.now()}`
-    
+    const body = await request.json();
+    const driverId = `DRV-${Date.now()}`;
+
     const driver = await prisma.driver.create({
       data: {
         driverId,
@@ -43,18 +35,16 @@ export async function POST(request: Request) {
         vehicleNumber: body.vehicleNumber || null,
         licenseNumber: body.licenseNumber || null,
         photoUrl: body.photoUrl || null,
-        status: body.status || 'active',
+        status: body.status || "active",
       },
-    })
-    return NextResponse.json(
-      { success: true, data: driver },
-      { headers: corsHeaders }
-    )
+    });
+    return jsonWithCors({ success: true, data: driver }, request);
   } catch (error) {
-    console.error('Error creating driver:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create driver' },
-      { status: 500, headers: corsHeaders }
-    )
+    console.error("Error creating driver:", error);
+    return jsonWithCors(
+      { success: false, error: "Failed to create driver" },
+      request,
+      { status: 500 }
+    );
   }
 }

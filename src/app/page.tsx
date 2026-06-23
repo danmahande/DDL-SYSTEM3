@@ -6,13 +6,16 @@ import LoginPage from "@/components/auth/LoginPage";
 import RegisterPage from "@/components/auth/RegisterPage";
 import AppContent from "@/components/layout/AppContent";
 
+const registrationEnabled =
+  process.env.NEXT_PUBLIC_ALLOW_PUBLIC_REGISTRATION === "true";
+
 export default function Home() {
   const { user, isLoading, checkSession } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
 
   useEffect(() => {
     checkSession();
-  }, []);
+  }, [checkSession]);
 
   if (isLoading) {
     return (
@@ -23,10 +26,16 @@ export default function Home() {
   }
 
   if (!user) {
-    return isRegistering ? (
-      <RegisterPage onSwitchToLogin={() => setIsRegistering(false)} />
-    ) : (
-      <LoginPage onSwitchToRegister={() => setIsRegistering(true)} />
+    if (isRegistering && registrationEnabled) {
+      return <RegisterPage onSwitchToLogin={() => setIsRegistering(false)} />;
+    }
+
+    return (
+      <LoginPage
+        onSwitchToRegister={
+          registrationEnabled ? () => setIsRegistering(true) : undefined
+        }
+      />
     );
   }
 

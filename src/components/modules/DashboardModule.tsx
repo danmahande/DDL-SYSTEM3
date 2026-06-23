@@ -47,42 +47,80 @@ interface Stats {
   delivered: number;
 }
 
-const inventoryData = [
-  { name: "Healthy", value: 85, color: "#22C55E" },
-  { name: "Low", value: 10, color: "#F59E0B" },
-  { name: "Critical", value: 5, color: "#EF4444" },
-];
+const inventoryColors = {
+  Healthy: "#22C55E",
+  Low: "#F59E0B",
+  Critical: "#EF4444",
+};
+
+function getStockStatus(currentStock: number, minStock: number) {
+  if (currentStock <= minStock * 0.3) return "Critical";
+  if (currentStock <= minStock) return "Low";
+  return "Healthy";
+}
 
 export default function DashboardModule() {
   const [signals, setSignals] = useState<DemandSignal[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, active: 0, delivered: 0 });
+  const [inventoryData, setInventoryData] = useState([
+    { name: "Healthy", value: 0, color: inventoryColors.Healthy },
+    { name: "Low", value: 0, color: inventoryColors.Low },
+    { name: "Critical", value: 0, color: inventoryColors.Critical },
+  ]);
+  const [merchantCount, setMerchantCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [retailerConnected, setRetailerConnected] = useState(false);
   const [lastRetailerSignal, setLastRetailerSignal] = useState<string | null>(null);
 
-  const fetchSignals = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const res = await fetch("/api/signals");
-      const data = await res.json();
-      if (data.success) {
-        setSignals(data.data);
-        setStats(data.stats);
+      const [signalsRes, productsRes, merchantsRes] = await Promise.all([
+        fetch("/api/signals"),
+        fetch("/api/products"),
+        fetch("/api/merchants"),
+      ]);
 
-        const retailerSignals = data.data.filter((s: DemandSignal) => s.source === "retailer_app");
+      const signalsData = await signalsRes.json();
+      if (signalsData.success) {
+        setSignals(signalsData.data);
+        setStats(signalsData.stats);
+
+        const retailerSignals = signalsData.data.filter(
+          (s: DemandSignal) => s.source === "retailer_app"
+        );
         if (retailerSignals.length > 0) {
           setRetailerConnected(true);
           setLastRetailerSignal(retailerSignals[0].createdAt);
         }
       }
+
+      const productsData = await productsRes.json();
+      if (productsData.success) {
+        const counts = { Healthy: 0, Low: 0, Critical: 0 };
+        productsData.data.forEach((product: { currentStock: number; minStock: number }) => {
+          const status = getStockStatus(product.currentStock, product.minStock);
+          counts[status as keyof typeof counts] += 1;
+        });
+        setInventoryData([
+          { name: "Healthy", value: counts.Healthy, color: inventoryColors.Healthy },
+          { name: "Low", value: counts.Low, color: inventoryColors.Low },
+          { name: "Critical", value: counts.Critical, color: inventoryColors.Critical },
+        ]);
+      }
+
+      const merchantsData = await merchantsRes.json();
+      if (merchantsData.success) {
+        setMerchantCount(merchantsData.stats?.total || 0);
+      }
     } catch (error) {
-      console.error("Error fetching signals:", error);
+      console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSignals();
+    fetchDashboardData();
   }, []);
 
   const getTopProducts = () => {
@@ -185,7 +223,7 @@ export default function DashboardModule() {
             <Store className="w-5 h-5 text-orange-500" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900">0</p>
+            <p className="text-lg font-bold text-gray-900">{merchantCount}</p>
             <p className="text-xs text-gray-500">Merchants</p>
           </div>
         </div>
@@ -212,7 +250,9 @@ export default function DashboardModule() {
             <Target className="w-5 h-5 text-amber-500" />
           </div>
           <div>
-            <p className="text-lg font-bold text-gray-900">0</p>
+            <p className="text-lg font-bold text-gray-900">
+              {merchantCount > 0 ? (stats.total / merchantCount).toFixed(1) : 0}
+            </p>
             <p className="text-xs text-gray-500">Signals/Merchant</p>
           </div>
         </div>

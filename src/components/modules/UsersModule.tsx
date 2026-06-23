@@ -1,14 +1,22 @@
 "use client";
 
-import { UserCog, Plus, Edit, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { UserCog, Plus } from "lucide-react";
 
-const users = [
-  { id: "USR-001", name: "System Admin", email: "admin@ddl.com", role: "super_admin", status: "Active", created: "2026-01-15" },
-  { id: "USR-002", name: "John Manager", email: "john@ddl.com", role: "admin", status: "Active", created: "2026-02-20" },
-  { id: "USR-003", name: "Jane Supplier", email: "jane@ddl.com", role: "supplier", status: "Active", created: "2026-03-10" },
-  { id: "USR-004", name: "Bob Driver", email: "bob@ddl.com", role: "driver", status: "Active", created: "2026-03-15" },
-  { id: "USR-005", name: "Alice Viewer", email: "alice@ddl.com", role: "viewer", status: "Inactive", created: "2026-04-01" },
-];
+interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface UserStats {
+  total: number;
+  active: number;
+  inactive: number;
+}
 
 const roleColors: Record<string, string> = {
   super_admin: "bg-red-100 text-red-700",
@@ -19,29 +27,66 @@ const roleColors: Record<string, string> = {
 };
 
 export default function UsersModule() {
+  const [users, setUsers] = useState<UserRecord[]>([]);
+  const [stats, setStats] = useState<UserStats>({ total: 0, active: 0, inactive: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch("/api/users");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to load users");
+        setUsers(data.data || []);
+        setStats(data.stats || { total: 0, active: 0, inactive: 0 });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load users");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2A4A]" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl p-5 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <UserCog className="w-5 h-5 text-[#1B2A4A]" />
             <span className="text-gray-500 text-sm">Total Users</span>
           </div>
-          <p className="text-2xl font-bold text-[#1B2A4A]">12</p>
+          <p className="text-2xl font-bold text-[#1B2A4A]">{stats.total}</p>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <UserCog className="w-5 h-5 text-green-500" />
             <span className="text-gray-500 text-sm">Active</span>
           </div>
-          <p className="text-2xl font-bold text-green-600">10</p>
+          <p className="text-2xl font-bold text-green-600">{stats.active}</p>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-gray-200">
           <div className="flex items-center gap-3 mb-2">
             <UserCog className="w-5 h-5 text-red-500" />
             <span className="text-gray-500 text-sm">Inactive</span>
           </div>
-          <p className="text-2xl font-bold text-red-600">2</p>
+          <p className="text-2xl font-bold text-red-600">{stats.inactive}</p>
         </div>
       </div>
 
@@ -62,7 +107,6 @@ export default function UsersModule() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Role</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Created</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -78,30 +122,29 @@ export default function UsersModule() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${roleColors[user.role]}`}>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${roleColors[user.role] || roleColors.viewer}`}>
                       {user.role.replace("_", " ")}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      user.status === "Active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                      user.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
                     }`}>
-                      {user.status}
+                      {user.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{user.created}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button className="p-2 text-[#1B2A4A] hover:bg-gray-100 rounded-lg transition-colors">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {new Date(user.createdAt).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
+              {users.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    No users found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

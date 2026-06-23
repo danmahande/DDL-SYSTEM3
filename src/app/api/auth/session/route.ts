@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  SESSION_COOKIE,
+  verifySessionToken,
+  toPublicSessionUser,
+} from "@/lib/session";
 
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("ddl-session");
+    const sessionCookie = cookieStore.get(SESSION_COOKIE);
 
-    if (!sessionCookie) {
+    if (!sessionCookie?.value) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
-    const sessionData = JSON.parse(atob(sessionCookie.value));
-    
-    if (sessionData.exp < Date.now()) {
+    const sessionData = await verifySessionToken(sessionCookie.value);
+
+    if (!sessionData) {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
-    return NextResponse.json({ user: sessionData });
-  } catch (error) {
+    return NextResponse.json({ user: toPublicSessionUser(sessionData) });
+  } catch {
     return NextResponse.json({ user: null }, { status: 500 });
   }
 }

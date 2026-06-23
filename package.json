@@ -5,10 +5,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "prisma generate && prisma db push --accept-data-loss && next build"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -44,6 +53,8 @@
   "devDependencies": {
     "@types/node": "25.9.1",
     "cesium": "^1.142.0",
-    "copy-webpack-plugin": "^14.0.0"
+    "copy-webpack-plugin": "^14.0.0",
+    "tsx": "^4.20.3",
+    "vitest": "^3.2.4"
   }
 }

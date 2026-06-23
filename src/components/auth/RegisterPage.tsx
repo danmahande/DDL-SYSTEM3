@@ -95,7 +95,7 @@ export default function RegisterPage({ onSwitchToLogin }: RegisterPageProps) {
                   className="w-full pl-10 pr-12 py-3 bg-white/5 border border-blue-200/20 rounded-xl text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder="••••••••"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
                 <button
                   type="button"
