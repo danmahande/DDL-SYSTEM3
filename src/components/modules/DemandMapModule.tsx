@@ -23,17 +23,11 @@ import {
   KAMPALA_BEARING,
   MAPBOX_ACCESS_TOKEN,
   STYLE_OPTIONS,
-  getRuntimeMapboxToken,
 } from "@/lib/map-config";
 import { useSignal } from "@/providers/SignalProvider";
 import { DemandSignal, Driver, Route } from "@prisma/client";
 
-  // Set Mapbox access token from public env (inlined at build-time)
-  useEffect(() => {
-    if (!mapboxgl.accessToken && MAPBOX_ACCESS_TOKEN) {
-      mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
-    }
-  }, []);
+
 
 const layers = [
   { id: "heatmap", label: "Heatmap", icon: TrendingUp, color: "text-red-400" },
@@ -75,6 +69,12 @@ export default function DemandMapModule() {
   const [runsheets, setRunsheets] = useState<Route[]>([]);
   const [showAssignDriverModal, setShowAssignDriverModal] = useState<DemandSignal | null>(null);
   const { focusSignal, setFocusSignal } = useSignal();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && MAPBOX_ACCESS_TOKEN && !mapboxgl.accessToken) {
+      mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+    }
+  }, []);
 
   const fetchSignals = async () => {
     try {
