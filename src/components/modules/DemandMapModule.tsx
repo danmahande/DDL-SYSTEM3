@@ -306,42 +306,44 @@ export default function DemandMapModule() {
       });
     };
 
-    initMap();
-
-    map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
-    map.current.addControl(new mapboxgl.ScaleControl(), "bottom-left");
-    map.current.addControl(new mapboxgl.AttributionControl(), "bottom-right");
-
-    const geolocateControl = new mapboxgl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,
-      showUserHeading: true,
-    });
-    map.current.addControl(geolocateControl, "top-right");
-
-    map.current.on("style.load", () => {
+    initMap().then(() => {
       if (!map.current) return;
 
-      // Only configure basemap properties for the STANDARD style
-      if (currentStyle === "STANDARD") {
-        try {
-          map.current.setConfigProperty("basemap", "lightPreset", "dusk");
-          map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
-          map.current.setConfigProperty("basemap", "showTransitLabels", true);
-        } catch (e) {
-          console.log("Could not configure Mapbox Standard:", e);
+      map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+      map.current.addControl(new mapboxgl.ScaleControl(), "bottom-left");
+      map.current.addControl(new mapboxgl.AttributionControl(), "bottom-right");
+
+      const geolocateControl = new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserHeading: true,
+      });
+      map.current.addControl(geolocateControl, "top-right");
+
+      map.current.on("style.load", () => {
+        if (!map.current) return;
+
+        // Only configure basemap properties for the STANDARD style
+        if (currentStyle === "STANDARD") {
+          try {
+            map.current.setConfigProperty("basemap", "lightPreset", "dusk");
+            map.current.setConfigProperty("basemap", "showPointOfInterestLabels", true);
+            map.current.setConfigProperty("basemap", "showTransitLabels", true);
+          } catch (e) {
+            console.log("Could not configure Mapbox Standard:", e);
+          }
         }
-      }
-      addSignalMarkers();
-    });
+        addSignalMarkers();
+      });
 
-    // Set map ready after initial load
-    map.current.on("load", () => {
-      setMapReady(true);
-    });
+      // Set map ready after initial load
+      map.current.on("load", () => {
+        setMapReady(true);
+      });
 
-    map.current.on("styleimagemissing", (e) => {
-      map.current?.addImage(e.id, new ImageData(1, 1));
+      map.current.on("styleimagemissing", (e) => {
+        map.current?.addImage(e.id, new ImageData(1, 1));
+      });
     });
 
     return () => {
