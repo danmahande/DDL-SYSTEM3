@@ -334,16 +334,30 @@ export default function DemandMapModule() {
 
     // Ensure common interaction handlers are enabled after style loads
     map.current.on('load', () => {
-      try {
-        map.current?.dragPan?.enable();
-        map.current?.dragRotate?.enable();
-        map.current?.scrollZoom?.enable();
-        map.current?.doubleClickZoom?.enable();
-        map.current?.boxZoom?.enable();
-        map.current?.touchZoomRotate?.enable();
-        map.current?.keyboard?.enable?.();
-      } catch (e) {
-        // Some handlers may not be present depending on the Mapbox version
+      // Check if map instance is valid and interactions are properly set
+      if (map.current) {
+        // Re-enable interactions in case they were disabled during style changes
+        if (map.current.dragPan) {
+          map.current.dragPan.enable();
+        }
+        if (map.current.dragRotate) {
+          map.current.dragRotate.enable();
+        }
+        if (map.current.scrollZoom) {
+          map.current.scrollZoom.enable();
+        }
+        if (map.current.doubleClickZoom) {
+          map.current.doubleClickZoom.enable();
+        }
+        if (map.current.boxZoom) {
+          map.current.boxZoom.enable();
+        }
+        if (map.current.touchZoomRotate) {
+          map.current.touchZoomRotate.enable();
+        }
+        if (map.current.keyboard) {
+          map.current.keyboard.enable();
+        }
       }
     });
 
@@ -357,7 +371,9 @@ export default function DemandMapModule() {
     });
 
     return () => {
-      map.current?.remove();
+      if (map.current) {
+        map.current.remove();
+      }
     };
   }, [currentStyle]); // Add currentStyle as a dependency since we're using it in the effect
 
