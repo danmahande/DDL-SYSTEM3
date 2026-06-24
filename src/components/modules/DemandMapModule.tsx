@@ -284,6 +284,8 @@ export default function DemandMapModule() {
     if (mapContainer.current) {
       mapContainer.current.style.pointerEvents = "auto";
       mapContainer.current.style.touchAction = "auto";
+      // Ensure the container has proper dimensions and positioning
+      mapContainer.current.style.position = "relative";
     }
 
     map.current = new mapboxgl.Map({
@@ -303,7 +305,12 @@ export default function DemandMapModule() {
       touchZoomRotate: true,
       keyboard: true,
       interactive: true,
+      // Make sure to disable attribution control if it's causing issues
+      attributionControl: true,
     });
+
+    // Disable default double click zoom and handle it separately if needed
+    map.current.doubleClickZoom.disable();
 
     map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.current.addControl(new mapboxgl.ScaleControl(), "bottom-left");
@@ -339,6 +346,9 @@ export default function DemandMapModule() {
         // Re-enable interactions in case they were disabled during style changes
         if (map.current.dragPan) {
           map.current.dragPan.enable();
+        } else {
+          // If dragPan is not available as a method, ensure it's enabled via options
+          console.log("DragPan is not available as a method, relying on initialization option");
         }
         if (map.current.dragRotate) {
           map.current.dragRotate.enable();
@@ -370,8 +380,25 @@ export default function DemandMapModule() {
       map.current?.addImage(e.id, new ImageData(1, 1));
     });
 
+    // Additional event listeners to debug panning issues
+    map.current.on('mousedown', () => {
+      console.log('Map received mousedown event');
+    });
+
+    map.current.on('movestart', () => {
+      console.log('Map move started');
+    });
+
+    map.current.on('moveend', () => {
+      console.log('Map move ended');
+    });
+
     return () => {
       if (map.current) {
+        // Remove event listeners to prevent memory leaks
+        map.current.off('mousedown');
+        map.current.off('movestart');
+        map.current.off('moveend');
         map.current.remove();
       }
     };
