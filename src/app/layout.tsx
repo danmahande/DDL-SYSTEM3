@@ -14,9 +14,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <meta name="next-public-mapbox-access-token" content={process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''} />
-      </head>
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>

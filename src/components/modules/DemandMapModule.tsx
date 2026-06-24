@@ -28,9 +28,12 @@ import {
 import { useSignal } from "@/providers/SignalProvider";
 import { DemandSignal, Driver, Route } from "@prisma/client";
 
-// Set Mapbox access token (use runtime fallback if needed)
-const runtimeToken = typeof window !== 'undefined' ? getRuntimeMapboxToken() : MAPBOX_ACCESS_TOKEN;
-mapboxgl.accessToken = runtimeToken || MAPBOX_ACCESS_TOKEN || '';
+  // Set Mapbox access token from public env (inlined at build-time)
+  useEffect(() => {
+    if (!mapboxgl.accessToken && MAPBOX_ACCESS_TOKEN) {
+      mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+    }
+  }, []);
 
 const layers = [
   { id: "heatmap", label: "Heatmap", icon: TrendingUp, color: "text-red-400" },
@@ -283,17 +286,6 @@ export default function DemandMapModule() {
   useEffect(() => {
     const initMap = async () => {
       if (!mapCanvasRef.current) return;
-
-      // If token missing, fetch from server endpoint
-      if (!mapboxgl.accessToken) {
-        try {
-          const res = await fetch('/api/mapbox-token');
-          const data = await res.json();
-          if (data?.token) mapboxgl.accessToken = data.token;
-        } catch (e) {
-          console.error('Error fetching mapbox token:', e);
-        }
-      }
 
       map.current = new mapboxgl.Map({
         container: mapCanvasRef.current,
