@@ -13,8 +13,21 @@ export const KAMPALA_BOUNDS: [[number, number], [number, number]] = [
 // Add your token to .env.local file as NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
 export const MAPBOX_ACCESS_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
 
-if (!MAPBOX_ACCESS_TOKEN) {
-  console.warn('Mapbox access token is not set. The map may not load properly.');
+export function getRuntimeMapboxToken(): string {
+  if (MAPBOX_ACCESS_TOKEN) return MAPBOX_ACCESS_TOKEN;
+  try {
+    if (typeof document !== "undefined") {
+      const meta = document.querySelector('meta[name="next-public-mapbox-access-token"]');
+      if (meta) return meta.getAttribute('content') || '';
+    }
+  } catch (e) {
+    // ignore
+  }
+  if (!MAPBOX_ACCESS_TOKEN) {
+    // Log on server side only
+    if (typeof window === 'undefined') console.warn('Mapbox access token is not set. The map may not load properly.');
+  }
+  return '';
 }
 
 // Mapbox Style URLs - Using the newer Standard style which shows more geographic features

@@ -23,12 +23,14 @@ import {
   KAMPALA_BEARING,
   MAPBOX_ACCESS_TOKEN,
   STYLE_OPTIONS,
+  getRuntimeMapboxToken,
 } from "@/lib/map-config";
 import { useSignal } from "@/providers/SignalProvider";
 import { DemandSignal, Driver, Route } from "@prisma/client";
 
-// Set Mapbox access token
-mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+// Set Mapbox access token (use runtime fallback if needed)
+const runtimeToken = typeof window !== 'undefined' ? getRuntimeMapboxToken() : MAPBOX_ACCESS_TOKEN;
+mapboxgl.accessToken = runtimeToken || MAPBOX_ACCESS_TOKEN || '';
 
 const layers = [
   { id: "heatmap", label: "Heatmap", icon: TrendingUp, color: "text-red-400" },
