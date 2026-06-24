@@ -381,24 +381,28 @@ export default function DemandMapModule() {
     });
 
     // Additional event listeners to debug panning issues
-    map.current.on('mousedown', () => {
+    const handleMouseDown = () => {
       console.log('Map received mousedown event');
-    });
+    };
 
-    map.current.on('movestart', () => {
+    const handleMoveStart = () => {
       console.log('Map move started');
-    });
+    };
 
-    map.current.on('moveend', () => {
+    const handleMoveEnd = () => {
       console.log('Map move ended');
-    });
+    };
+
+    map.current.on('mousedown', handleMouseDown);
+    map.current.on('movestart', handleMoveStart);
+    map.current.on('moveend', handleMoveEnd);
 
     return () => {
       if (map.current) {
         // Remove event listeners to prevent memory leaks
-        map.current.off('mousedown');
-        map.current.off('movestart');
-        map.current.off('moveend');
+        map.current.off('mousedown', handleMouseDown);
+        map.current.off('movestart', handleMoveStart);
+        map.current.off('moveend', handleMoveEnd);
         map.current.remove();
       }
     };
