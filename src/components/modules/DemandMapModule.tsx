@@ -281,17 +281,32 @@ export default function DemandMapModule() {
   }, []);
 
   useEffect(() => {
-    if (!mapCanvasRef.current) return;
+    const initMap = async () => {
+      if (!mapCanvasRef.current) return;
 
-    map.current = new mapboxgl.Map({
-      container: mapCanvasRef.current,
-      style: STYLE_OPTIONS[currentStyle], // Use the configured style options that will use the token
-      center: BUGOLOBI_CENTER,
-      zoom: KAMPALA_ZOOM,
-      pitch: KAMPALA_PITCH,
-      bearing: KAMPALA_BEARING,
-      antialias: true,
-    });
+      // If token missing, fetch from server endpoint
+      if (!mapboxgl.accessToken) {
+        try {
+          const res = await fetch('/api/mapbox-token');
+          const data = await res.json();
+          if (data?.token) mapboxgl.accessToken = data.token;
+        } catch (e) {
+          console.error('Error fetching mapbox token:', e);
+        }
+      }
+
+      map.current = new mapboxgl.Map({
+        container: mapCanvasRef.current,
+        style: STYLE_OPTIONS[currentStyle], // Use the configured style options that will use the token
+        center: BUGOLOBI_CENTER,
+        zoom: KAMPALA_ZOOM,
+        pitch: KAMPALA_PITCH,
+        bearing: KAMPALA_BEARING,
+        antialias: true,
+      });
+    };
+
+    initMap();
 
     map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.current.addControl(new mapboxgl.ScaleControl(), "bottom-left");
