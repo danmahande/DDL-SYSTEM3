@@ -144,56 +144,140 @@ export default function DemandMapModule() {
     markers.current.forEach(marker => marker.remove());
     markers.current = [];
 
-    signals.forEach(signal => {
-      if (signal.latitude && signal.longitude && activeLayers.signals) {
-        const color = signal.urgency === "urgent" ? "#EF4444" : signal.urgency === "normal" ? "#F59E0B" : "#3B82F6";
-        
-        // Create custom popup with buttons
-        const popup = new mapboxgl.Popup({ offset: 25 });
-        
-        // Use a div to render our content
-        const popupContent = document.createElement('div');
-        popupContent.innerHTML = `
-          <div style="padding: 12px; max-width: 240px;">
-            <h4 style="font-weight: bold; margin: 0 0 8px 0;">${signal.businessName || signal.signalId}</h4>
-            <p style="margin: 4px 0;">${signal.productLabel} (x${signal.quantity})</p>
-            <p style="margin: 4px 0; font-size: 12px; color: ${color};">${signal.urgency}</p>
-            <div style="margin-top: 12px; display: flex; gap: 8px; flex-direction: column;">
-              ${activeRunsheet ? `<button id="add-to-runsheet-${signal.id}" style="width:100%; padding:8px 12px; background:#FF6B35; color:white; border:none; border-radius:6px; cursor:pointer;">Add to Runsheet</button>` : ''}
-              <button id="assign-driver-${signal.id}" style="width:100%; padding:8px 12px; background:#3B82F6; color:white; border:none; border-radius:6px; cursor:pointer;">Assign Driver</button>
-            </div>
-          </div>
-        `;
-        
-        // Add click handlers to buttons
-        const addBtn = popupContent.querySelector(`#add-to-runsheet-${signal.id}`);
-        if (addBtn) {
-          addBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleAddToRunsheet(signal);
-            popup.remove();
-          });
-        }
-        
-        const assignBtn = popupContent.querySelector(`#assign-driver-${signal.id}`);
-        if (assignBtn) {
-          assignBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setShowAssignDriverModal(signal);
-            popup.remove();
-          });
-        }
-        
-        popup.setDOMContent(popupContent);
-
-        const marker = new mapboxgl.Marker({ color })
-          .setLngLat([signal.longitude, signal.latitude])
-          .setPopup(popup)
-          .addTo(map.current!);
-
-        markers.current.push(marker);
+    // Prepare data for advanced layers (clustering/heatmap)
+    if (map.current.isStyleLoaded()) {
+      // Create or update the signals data source
+      const sourceId = 'signals-data';
+      if (map.current.getSource(sourceId)) {
+        (map.current.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
+          type: 'FeatureCollection',
+          features: signals
+            .filter(signal => signal.latitude && signal.longitude)
+            .map(signal => ({
+              type: 'Feature',
+              properties: {
+                id: signal.id,
+                signalId: signal.signalId,
+                businessName: signal.businessName || signal.shopkeeperId,
+                productLabel: signal.productLabel,
+                quantity: signal.quantity,
+                urgency: signal.urgency,
+                urgencyValue: signal.urgency === 'urgent' ? 3 : signal.urgency === 'normal' ? 2 : 1,
+                shopkeeperId: signal.shopkeeperId,
+                productCategory: signal.productCategory,
+                packageSize: signal.packageSize,
+                source: signal.source,
+                status: signal.status,
+                createdAt: signal.createdAt?.toISOString(),
+                updatedAt: signal.updatedAt?.toISOString(),
+                neighborhood: signal.neighborhood,
+                driverId: signal.driverId,
+                routeId: signal.routeId,
+                latitude: signal.latitude,
+                longitude: signal.longitude
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: [signal.longitude!, signal.latitude!]
+              }
+            }))
+        });
+      } else {
+        map.current.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: signals
+              .filter(signal => signal.latitude && signal.longitude)
+              .map(signal => ({
+                type: 'Feature',
+                properties: {
+                  id: signal.id,
+                  signalId: signal.signalId,
+                  businessName: signal.businessName || signal.shopkeeperId,
+                  productLabel: signal.productLabel,
+                  quantity: signal.quantity,
+                  urgency: signal.urgency,
+                  urgencyValue: signal.urgency === 'urgent' ? 3 : signal.urgency === 'normal' ? 2 : 1,
+                  shopkeeperId: signal.shopkeeperId,
+                  productCategory: signal.productCategory,
+                  packageSize: signal.packageSize,
+                  source: signal.source,
+                  status: signal.status,
+                  createdAt: signal.createdAt?.toISOString(),
+                  updatedAt: signal.updatedAt?.toISOString(),
+                  neighborhood: signal.neighborhood,
+                  driverId: signal.driverId,
+                  routeId: signal.routeId,
+                  latitude: signal.latitude,
+                  longitude: signal.longitude
+                },
+                geometry: {
+                  type: 'Point',
+                  coordinates: [signal.longitude!, signal.latitude!]
+                }
+              }))
+          },
+          cluster: true,
+          clusterMaxZoom: 14, // Max zoom to cluster points on
+          clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
+        });
       }
-    });
+    }
+
+    // Add individual markers for signals if clustering is not active
+    if (activeLayers.signals && (!map.current.getLayer('signals-cluster') || map.current.getZoom() > 14)) {
+      signals.forEach(signal => {
+        if (signal.latitude && signal.longitude) {
+          const color = signal.urgency === "urgent" ? "#EF4444" : signal.urgency === "normal" ? "#F59E0B" : "#3B82F6";
+          
+          // Create custom popup with buttons
+          const popup = new mapboxgl.Popup({ offset: 25 });
+          
+          // Use a div to render our content
+          const popupContent = document.createElement('div');
+          popupContent.innerHTML = `
+            <div style="padding: 12px; max-width: 240px;">
+              <h4 style="font-weight: bold; margin: 0 0 8px 0;">${signal.businessName || signal.signalId}</h4>
+              <p style="margin: 4px 0;">${signal.productLabel} (x${signal.quantity})</p>
+              <p style="margin: 4px 0; font-size: 12px; color: ${color};">${signal.urgency}</p>
+              <div style="margin-top: 12px; display: flex; gap: 8px; flex-direction: column;">
+                ${activeRunsheet ? `<button id="add-to-runsheet-${signal.id}" style="width:100%; padding:8px 12px; background:#FF6B35; color:white; border:none; border-radius:6px; cursor:pointer;">Add to Runsheet</button>` : ''}
+                <button id="assign-driver-${signal.id}" style="width:100%; padding:8px 12px; background:#3B82F6; color:white; border:none; border-radius:6px; cursor:pointer;">Assign Driver</button>
+              </div>
+            </div>
+          `;
+          
+          // Add click handlers to buttons
+          const addBtn = popupContent.querySelector(`#add-to-runsheet-${signal.id}`);
+          if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              handleAddToRunsheet(signal);
+              popup.remove();
+            });
+          }
+          
+          const assignBtn = popupContent.querySelector(`#assign-driver-${signal.id}`);
+          if (assignBtn) {
+            assignBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              setShowAssignDriverModal(signal);
+              popup.remove();
+            });
+          }
+          
+          popup.setDOMContent(popupContent);
+
+          const marker = new mapboxgl.Marker({ color })
+            .setLngLat([signal.longitude, signal.latitude])
+            .setPopup(popup)
+            .addTo(map.current!);
+
+          markers.current.push(marker);
+        }
+      });
+    }
 
     // Mark map as ready after markers are added
     setMapReady(true);
@@ -312,6 +396,7 @@ export default function DemandMapModule() {
     // Disable default double click zoom and handle it separately if needed
     map.current.doubleClickZoom.disable();
 
+    // Add custom controls and advanced features
     map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.current.addControl(new mapboxgl.ScaleControl(), "bottom-left");
     map.current.addControl(new mapboxgl.AttributionControl(), "bottom-right");
@@ -322,6 +407,19 @@ export default function DemandMapModule() {
       showUserHeading: true,
     });
     map.current.addControl(geolocateControl, "top-right");
+
+    // Add fullscreen control
+    map.current.addControl(new mapboxgl.FullscreenControl(), "top-right");
+
+    // Add custom draw control for drawing areas/geofences
+    // Note: This would require installing @mapbox/mapbox-gl-draw
+    // const Draw = new MapboxDraw();
+    // map.current.addControl(Draw, 'top-left');
+
+    // Add measure control for distance measurement
+    // Note: This would require a custom implementation or third-party plugin
+    // const measureControl = new MeasureControl();
+    // map.current.addControl(measureControl, 'top-left');
 
     map.current.on("style.load", () => {
       if (!map.current) return;
@@ -336,6 +434,9 @@ export default function DemandMapModule() {
           console.log("Could not configure Mapbox Standard:", e);
         }
       }
+      
+      // Add additional layers for advanced visualization
+      addAdvancedLayers();
       addSignalMarkers();
     });
 
@@ -368,6 +469,13 @@ export default function DemandMapModule() {
         if (map.current.keyboard) {
           map.current.keyboard.enable();
         }
+        
+        // Add additional event listeners for enhanced user experience
+        map.current.on('zoomend', handleZoomEnd);
+        
+        map.current.on('rotateend', handleRotateEnd);
+        
+        map.current.on('pitchend', handlePitchEnd);
       }
     });
 
@@ -403,10 +511,156 @@ export default function DemandMapModule() {
         map.current.off('mousedown', handleMouseDown);
         map.current.off('movestart', handleMoveStart);
         map.current.off('moveend', handleMoveEnd);
+        map.current.off('zoomend', handleZoomEnd);
+        map.current.off('rotateend', handleRotateEnd);
+        map.current.off('pitchend', handlePitchEnd);
         map.current.remove();
       }
     };
   }, [currentStyle]); // Add currentStyle as a dependency since we're using it in the effect
+
+  // Define event handlers for enhanced user experience
+  const handleZoomEnd = () => {
+    console.log('Zoom level:', map.current?.getZoom());
+  };
+  
+  const handleRotateEnd = () => {
+    console.log('Bearing:', map.current?.getBearing());
+  };
+  
+  const handlePitchEnd = () => {
+    console.log('Pitch:', map.current?.getPitch());
+  };
+
+  // Add advanced visualization layers (heatmap, clusters, etc.)
+  const addAdvancedLayers = () => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    // Add heatmap layer for signal density
+    if (!map.current.getLayer('signals-heat')) {
+      map.current.addLayer({
+        'id': 'signals-heat',
+        'type': 'heatmap',
+        'source': 'signals-data',
+        'maxzoom': 15,
+        'paint': {
+          // Increase the heatmap weight based on urgency - urgent signals are more prominent
+          'heatmap-weight': [
+            'interpolate',
+            ['linear'],
+            ['get', 'urgencyValue'], // Assuming you add this property to your data
+            0, 0,
+            3, 1
+          ],
+          // Increase intensity as zoom level increases
+          'heatmap-intensity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 1,
+            15, 3
+          ],
+          // Color ramp for heatmap. Domain is 0 (low) to 1 (high).
+          // Begin color ramp at 0-stop with a 0-transparancy color
+          // to create a blur-like effect.
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(33, 102, 172, 0)',
+            0.2, 'rgb(103, 169, 207)',
+            0.4, 'rgb(209, 229, 240)',
+            0.6, 'rgb(253, 219, 199)',
+            0.8, 'rgb(239, 138, 98)',
+            1, 'rgb(178, 24, 43)'
+          ],
+          // Adjust the heatmap radius by zoom level
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 2,
+            9, 20
+          ],
+          'heatmap-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            7, 1,
+            9, 0.3
+          ]
+        }
+      }, 'waterway-label'); // Try to place before water labels
+    }
+
+    // Add cluster layer for grouping nearby signals
+    if (!map.current.getLayer('signals-cluster')) {
+      map.current.addLayer({
+        id: 'signals-cluster',
+        type: 'circle',
+        source: 'signals-data',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'step',
+            ['get', 'point_count'],
+            '#51bbd6',
+            100,
+            '#f1f075',
+            750,
+            '#f28cb1'
+          ],
+          'circle-radius': [
+            'step',
+            ['get', 'point_count'],
+            20,
+            100,
+            30,
+            750,
+            40
+          ]
+        }
+      });
+
+      // Add cluster count labels
+      if (!map.current.getLayer('signals-cluster-count')) {
+        map.current.addLayer({
+          id: 'signals-cluster-count',
+          type: 'symbol',
+          source: 'signals-data',
+          filter: ['has', 'point_count'],
+          layout: {
+            'text-field': '{point_count_abbreviated}',
+            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+            'text-size': 12
+          }
+        });
+      }
+    }
+
+    // Add circle layer for unclustered points
+    if (!map.current.getLayer('signals-unclustered')) {
+      map.current.addLayer({
+        id: 'signals-unclustered',
+        type: 'circle',
+        source: 'signals-data',
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': [
+            'match',
+            ['get', 'urgency'],
+            'urgent', '#EF4444',
+            'normal', '#F59E0B',
+            'low', '#3B82F6',
+            '#9CA3AF' // default color
+          ],
+          'circle-radius': 8,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#fff'
+        }
+      });
+    }
+  };
 
   useEffect(() => {
     addSignalMarkers();
@@ -422,6 +676,36 @@ export default function DemandMapModule() {
 
   const toggleLayer = (id: string) => {
     setActiveLayers((prev) => ({ ...prev, [id]: !prev[id] }));
+    
+    // Update visibility of advanced layers based on toggles
+    if (map.current && map.current.isStyleLoaded()) {
+      switch(id) {
+        case 'heatmap':
+          if (map.current.getLayer('signals-heat')) {
+            map.current.setLayoutProperty('signals-heat', 'visibility', 
+              activeLayers.heatmap ? 'visible' : 'none');
+          }
+          break;
+        case 'clusters':
+          if (map.current.getLayer('signals-cluster')) {
+            map.current.setLayoutProperty('signals-cluster', 'visibility', 
+              activeLayers.clusters ? 'visible' : 'none');
+          }
+          if (map.current.getLayer('signals-cluster-count')) {
+            map.current.setLayoutProperty('signals-cluster-count', 'visibility', 
+              activeLayers.clusters ? 'visible' : 'none');
+          }
+          if (map.current.getLayer('signals-unclustered')) {
+            map.current.setLayoutProperty('signals-unclustered', 'visibility', 
+              activeLayers.clusters ? 'visible' : 'none');
+          }
+          break;
+        case 'signals':
+          // Hide/show individual signal markers based on this layer
+          // Individual markers will be handled in addSignalMarkers function
+          break;
+      }
+    }
   };
 
   // Track if map is fully loaded with markers
