@@ -435,6 +435,9 @@ export default function DemandMapModule() {
         }
       }
       
+      // Add terrain and water features if the style supports it
+      addTerrainAndWaterFeatures();
+      
       // Add additional layers for advanced visualization
       addAdvancedLayers();
       addSignalMarkers();
@@ -659,6 +662,113 @@ export default function DemandMapModule() {
           'circle-stroke-color': '#fff'
         }
       });
+    }
+  };
+
+  // Add terrain and water features
+  const addTerrainAndWaterFeatures = () => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    // Add terrain if the style supports it
+    if (map.current.getStyle().terrain) {
+      console.log('Terrain already configured in style');
+    } else {
+      // For styles that don't have built-in terrain, we can add hillshading
+      if (!map.current.getLayer('hillshading')) {
+        map.current.addLayer({
+          'id': 'hillshading',
+          'type': 'hillshade',
+          'source': {
+            'type': 'raster-dem',
+            'url': 'mapbox://mapbox.terrain-rgb',
+            'tileSize': 512
+          },
+          'paint': {
+            'hillshade-shadow-color': '#473B24'
+          }
+        }, 'waterway-label'); // Insert before labels
+      }
+    }
+
+    // Enhance water features with custom styling
+    if (map.current.getLayer('water')) {
+      map.current.setPaintProperty('water', 'fill-color', [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        '#2a4ba9', // Highlight color when hovered
+        '#2a7fcb'  // Normal water color
+      ]);
+      map.current.setPaintProperty('water', 'fill-opacity', 0.7);
+    }
+
+    // Add water depth contours if available
+    if (!map.current.getLayer('water-depth')) {
+      // This layer would require custom bathymetry data
+      // For demonstration purposes, we'll skip this unless you have depth data
+    }
+
+    // Add custom water features if not already present
+    if (!map.current.getLayer('custom-water-features')) {
+      map.current.addLayer({
+        'id': 'custom-water-features',
+        'type': 'line',
+        'source': 'composite',
+        'source-layer': 'waterway',
+        'filter': ['in', '$type', 'LineString'],
+        'paint': {
+          'line-color': '#2a7fcb',
+          'line-width': [
+            'interpolate',
+            ['exponential', 1.2],
+            ['zoom'],
+            8.5, ['case',
+              ['==', ['get', 'class'], 'river'], 1,
+              ['==', ['get', 'class'], 'canal'], 0.8,
+              0.5
+            ],
+            20, ['case',
+              ['==', ['get', 'class'], 'river'], 8,
+              ['==', ['get', 'class'], 'canal'], 6,
+              4
+            ]
+          ],
+          'line-opacity': 0.8
+        }
+      }, 'water');
+    }
+
+    // Add elevation contour lines if the style supports it
+    if (!map.current.getLayer('contour-lines')) {
+      // Add contour lines layer (requires contour data source)
+      // For now, we'll add it conditionally if the data exists
+      if (map.current.getSource('contours')) {
+        map.current.addLayer({
+          'id': 'contour-lines',
+          'type': 'line',
+          'source': 'contours',
+          'layout': {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          'paint': {
+            'line-color': '#888',
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 1,
+              16, 1.5
+            ],
+            'line-opacity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10, 0.3,
+              16, 0.6
+            ]
+          }
+        }, 'water');
+      }
     }
   };
 
